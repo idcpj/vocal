@@ -1,0 +1,351 @@
+{
+  "version": "2.8",
+  "children": [
+    {
+      "type": "frame",
+      "id": "t0xxC",
+      "x": 0,
+      "y": 0,
+      "name": "iPhone Client",
+      "clip": true,
+      "width": 393,
+      "height": 852,
+      "fill": "#0A0F1C",
+      "layout": "vertical",
+      "children": [
+        {
+          "type": "frame",
+          "id": "g6oGa",
+          "name": "header",
+          "width": "fill_container",
+          "height": 60,
+          "padding": [
+            0,
+            24
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "xFuwa",
+              "name": "title",
+              "fill": "#22D3EE",
+              "content": "VOCAL",
+              "fontFamily": "Inter",
+              "fontSize": 18,
+              "fontWeight": "700",
+              "letterSpacing": 2
+            },
+            {
+              "type": "icon_font",
+              "id": "ekpLp",
+              "name": "settings_icon",
+              "width": 24,
+              "height": 24,
+              "iconFontName": "settings",
+              "iconFontFamily": "lucide",
+              "fill": "#94A3B8"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "f2OiA",
+          "name": "main",
+          "width": "fill_container",
+          "height": "fill_container",
+          "layout": "vertical",
+          "gap": 32,
+          "padding": [
+            0,
+            24
+          ],
+          "justifyContent": "center",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "ellipse",
+              "id": "su26P",
+              "name": "button_outer",
+              "fill": "#1E293B",
+              "width": 140,
+              "height": 140,
+              "stroke": {
+                "thickness": 2,
+                "fill": "#22D3EE"
+              }
+            },
+            {
+              "type": "frame",
+              "id": "aSYzF",
+              "name": "status_frame",
+              "layout": "vertical",
+              "gap": 8,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "sdX8r",
+                  "name": "status_value",
+                  "fill": "#22D3EE",
+                  "content": "CONNECTED TO MAC MINI",
+                  "fontFamily": "JetBrains Mono",
+                  "fontSize": 12,
+                  "fontWeight": "600",
+                  "letterSpacing": 1
+                },
+                {
+                  "type": "text",
+                  "id": "e5Sbn",
+                  "name": "status_detail",
+                  "fill": "#64748B",
+                  "content": "ready to sync",
+                  "fontFamily": "JetBrains Mono",
+                  "fontSize": 11
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "E2oKB",
+          "name": "transcription_bg",
+          "width": "fill_container",
+          "fill": "#0F172A",
+          "layout": "vertical",
+          "gap": 12,
+          "padding": 24,
+          "children": [
+            {
+              "type": "text",
+              "id": "Y7Uun",
+              "name": "label_t",
+              "fill": "#64748B",
+              "content": "LIVE TRANSCRIPTION",
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fontWeight": "600",
+              "letterSpacing": 2
+            },
+            {
+              "type": "text",
+              "id": "7qS1Y",
+              "name": "text_t",
+              "fill": "#FFFFFF",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "The quick brown fox jumps over the lazy dog...",
+              "fontFamily": "JetBrains Mono",
+              "fontSize": 14
+            },
+            {
+              "type": "rectangle",
+              "id": "hBLy5",
+              "name": "cursor",
+              "fill": "#22D3EE",
+              "width": 8,
+              "height": 16
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "1VIet",
+      "x": 440,
+      "y": 126,
+      "name": "Mac Menu Bar Host",
+      "clip": true,
+      "width": 200,
+      "height": 300,
+      "fill": "#1E293B",
+      "cornerRadius": 12,
+      "layout": "vertical",
+      "children": [
+        {
+          "type": "frame",
+          "id": "WY0U1",
+          "name": "dr_header",
+          "width": "fill_container",
+          "height": 50,
+          "padding": [
+            12,
+            16
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "CHhxJ",
+              "name": "dr_title",
+              "fill": "#FFFFFF",
+              "content": "Vocal Host",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "600"
+            },
+            {
+              "type": "frame",
+              "id": "cNVnw",
+              "name": "dr_toggle",
+              "width": 36,
+              "height": 20,
+              "fill": "#22D3EE",
+              "cornerRadius": 10,
+              "padding": 2,
+              "children": [
+                {
+                  "type": "ellipse",
+                  "id": "0VWOG",
+                  "name": "dr_knob",
+                  "fill": "#0A0F1C",
+                  "width": 16,
+                  "height": 16
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "rectangle",
+          "id": "c6GcN",
+          "name": "dr_divider",
+          "fill": "#0F172A",
+          "width": "fill_container",
+          "height": 1
+        },
+        {
+          "type": "frame",
+          "id": "1zyQz",
+          "name": "dr_status",
+          "width": "fill_container",
+          "layout": "vertical",
+          "gap": 8,
+          "padding": 16,
+          "children": [
+            {
+              "type": "text",
+              "id": "VLIas",
+              "name": "dr_status_label",
+              "fill": "#64748B",
+              "content": "STATUS",
+              "fontFamily": "Inter",
+              "fontSize": 10,
+              "fontWeight": "600",
+              "letterSpacing": 1
+            },
+            {
+              "type": "text",
+              "id": "dubLV",
+              "name": "dr_status_val",
+              "fill": "#22D3EE",
+              "content": "Connected: iPhone 15 Pro",
+              "fontFamily": "JetBrains Mono",
+              "fontSize": 12,
+              "fontWeight": "500"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "8oAet",
+          "name": "dr_actions",
+          "width": "fill_container",
+          "layout": "vertical",
+          "gap": 4,
+          "padding": [
+            0,
+            8,
+            8,
+            8
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "ykszE",
+              "name": "dr_btn1",
+              "width": "fill_container",
+              "fill": "#0F172A",
+              "cornerRadius": 6,
+              "padding": 8,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "Dyu9l",
+                  "name": "dr_btn1_txt",
+                  "fill": "#94A3B8",
+                  "content": "Check Permissions",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "z9YpK",
+              "name": "dr_btn2",
+              "width": "fill_container",
+              "cornerRadius": 6,
+              "padding": 8,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "5tQvR",
+                  "name": "dr_btn2_txt",
+                  "fill": "#94A3B8",
+                  "content": "Quit Vocal",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "3YmpQ",
+      "x": 440,
+      "y": 9,
+      "name": "Mac Menu Bar",
+      "width": 200,
+      "height": 32,
+      "fill": "#000000",
+      "padding": [
+        0,
+        12
+      ],
+      "alignItems": "center",
+      "children": [
+        {
+          "type": "icon_font",
+          "id": "FLyL9",
+          "name": "mic_icon_mb",
+          "width": 14,
+          "height": 14,
+          "iconFontName": "mic",
+          "iconFontFamily": "lucide",
+          "fill": "#FFFFFF"
+        },
+        {
+          "type": "text",
+          "id": "vrTjR",
+          "name": "mb_text",
+          "fill": "#FFFFFF",
+          "content": "VOCAL",
+          "fontFamily": "Inter",
+          "fontSize": 10,
+          "fontWeight": "700",
+          "letterSpacing": 1
+        }
+      ]
+    }
+  ]
+}
