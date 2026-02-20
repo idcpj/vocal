@@ -42,6 +42,9 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
   bool _isConnected = false;
   String _statusText = 'Searching for Mac...';
   late AnimationController _animController;
+  DateTime? _lastHeartbeat;
+  String? _selectedLocaleId;
+  String _lastSentWords = '';
 
   @override
   void initState() {
@@ -55,7 +58,18 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
   }
 
   void _initSpeech() async {
-    await _speechToText.initialize();
+    bool available = await _speechToText.initialize();
+    if (available) {
+      final locales = await _speechToText.locales();
+      // Try to find Chinese (Mandarin)
+      for (var locale in locales) {
+        if (locale.localeId.startsWith('zh')) {
+          _selectedLocaleId = locale.localeId;
+          print('Selected Chinese locale: ${locale.name}');
+          break;
+        }
+      }
+    }
     if (mounted) setState(() {});
   }
 
@@ -97,17 +111,67 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
       print('Attempting connection to $wsUrl');
       if (mounted) setState(() => _statusText = 'Connecting to Mac...');
       _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
+
+      _channel!.stream.listen(
+        (message) {
+          _lastHeartbeat = DateTime.now();
+          if (message.toString().contains('"type":"ping"') ||
+              message.toString().contains('"type": "ping"')) {
+            _channel!.sink.add('{"type": "pong"}');
+            print('Received ping, sent pong.');
+          }
+        },
+        onDone: () {
+          _handleDisconnect();
+        },
+        onError: (e) {
+          _handleDisconnect();
+        },
+      );
+
       setState(() {
         _isConnected = true;
         _statusText = 'Connected to Mac';
       });
+
+      _startHeartbeatCheck();
     } catch (e) {
       if (mounted) setState(() => _statusText = 'Connection failed');
     }
   }
 
+  void _handleDisconnect() {
+    if (mounted && _isConnected) {
+      setState(() {
+        _isConnected = false;
+        _statusText = 'Connection Lost';
+      });
+      _discoverServices(); // Restart discovery
+    }
+  }
+
+  void _startHeartbeatCheck() {
+    Future.doWhile(() async {
+      await Future.delayed(const Duration(seconds: 10));
+      if (!_isConnected) return false;
+
+      final now = DateTime.now();
+      if (_lastHeartbeat != null &&
+          now.difference(_lastHeartbeat!).inSeconds > 15) {
+        print('Heartbeat timeout.');
+        _handleDisconnect();
+        return false;
+      }
+      return true;
+    });
+  }
+
   void _startListening() async {
-    await _speechToText.listen(onResult: _onSpeechResult);
+    _lastSentWords = ''; // Reset for new session
+    await _speechToText.listen(
+      onResult: _onSpeechResult,
+      localeId: _selectedLocaleId,
+    );
     if (mounted) setState(() {});
   }
 
@@ -117,11 +181,27 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
   }
 
   void _onSpeechResult(SpeechRecognitionResult result) {
+    final newWords = result.recognizedWords;
     setState(() {
-      _lastWords = result.recognizedWords;
+      _lastWords = newWords;
     });
+
     if (_isConnected && _channel != null) {
-      _channel!.sink.add(_lastWords);
+      String delta = '';
+      if (newWords.startsWith(_lastSentWords)) {
+        delta = newWords.substring(_lastSentWords.length);
+      } else {
+        // Recognition might have diverged or restarted (e.g. system correction)
+        // In this case, we send a space and the whole thing to be safe,
+        // or just the whole thing if we assume the previous text was already "finalized" enough.
+        // For now, let's just send the whole new content if it doesn't match prefix.
+        delta = newWords;
+      }
+
+      if (delta.isNotEmpty) {
+        _channel!.sink.add(delta);
+        _lastSentWords = newWords;
+      }
     }
   }
 

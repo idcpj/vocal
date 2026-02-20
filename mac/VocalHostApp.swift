@@ -6,9 +6,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
     var netService: NetService?
     var listener: NWListener?
     var connectedConnection: NWConnection?
+    var heartbeatTimer: Timer?
     var isConnected: Bool = false {
         didSet {
             updateMenu()
+            if isConnected {
+                startHeartbeat()
+            } else {
+                stopHeartbeat()
+            }
         }
     }
     
@@ -108,7 +114,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
             if let data = data, !data.isEmpty {
                 if let message = String(data: data, encoding: .utf8) {
                     print("Received Message: \(message)")
-                    self?.injectText(message)
+                    if message.contains("\"type\":\"pong\"") || message.contains("\"type\": \"pong\"") {
+                        print("Heartbeat pong received.")
+                    } else if !message.contains("\"type\":") {
+                        // Only inject text if it's NOT a JSON control message
+                        self?.injectText(message)
+                    }
                 }
             }
             
@@ -156,6 +167,44 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
     @objc func checkPermissions() {
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
         let _ = AXIsProcessTrustedWithOptions(options as CFDictionary)
+    }
+
+    // MARK: - Heartbeat
+    
+    func startHeartbeat() {
+        DispatchQueue.main.async {
+            self.heartbeatTimer?.invalidate()
+            self.heartbeatTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+                self?.sendPing()
+            }
+            print("Heartbeat started.")
+        }
+    }
+    
+    func stopHeartbeat() {
+        DispatchQueue.main.async {
+            self.heartbeatTimer?.invalidate()
+            self.heartbeatTimer = nil
+            print("Heartbeat stopped.")
+        }
+    }
+    
+    func sendPing() {
+        guard let connection = connectedConnection, isConnected else { return }
+        let ping = "{\"type\": \"ping\"}"
+        if let data = ping.data(using: .utf8) {
+            let metadata = NWProtocolWebSocket.Metadata(opcode: .text)
+            let context = NWConnection.ContentContext(identifier: "ping", metadata: [metadata])
+            connection.send(content: data, contentContext: context, isComplete: true, completion: .contentProcessed({ error in
+                if let error = error {
+                    print("Ping failed: \(error). Disconnecting.")
+                    DispatchQueue.main.async {
+                        self.isConnected = false
+                        connection.cancel()
+                    }
+                }
+            }))
+        }
     }
 }
 
