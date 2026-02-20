@@ -4,7 +4,7 @@
     {
       "type": "frame",
       "id": "t0xxC",
-      "x": 0,
+      "x": -3,
       "y": 0,
       "name": "iPhone Client",
       "clip": true,
@@ -38,14 +38,89 @@
               "letterSpacing": 2
             },
             {
-              "type": "icon_font",
-              "id": "ekpLp",
-              "name": "settings_icon",
-              "width": 24,
-              "height": 24,
-              "iconFontName": "settings",
-              "iconFontFamily": "lucide",
-              "fill": "#94A3B8"
+              "type": "frame",
+              "id": "kyZwK",
+              "name": "status_group",
+              "gap": 12,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "IJ4wd",
+                  "name": "online_badge",
+                  "fill": "#0D2818",
+                  "cornerRadius": 12,
+                  "stroke": {
+                    "thickness": 1,
+                    "fill": "#22C55E33"
+                  },
+                  "gap": 6,
+                  "padding": [
+                    4,
+                    10
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "ellipse",
+                      "id": "nNDR2",
+                      "name": "greenDot",
+                      "fill": "#22C55E",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "text",
+                      "id": "bF11A",
+                      "name": "onlineText",
+                      "fill": "#22C55E",
+                      "content": "Online",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "18O3i",
+                  "name": "device_count_badge",
+                  "fill": "#2D1215",
+                  "cornerRadius": 12,
+                  "stroke": {
+                    "thickness": 1,
+                    "fill": "#EF444433"
+                  },
+                  "gap": 4,
+                  "padding": [
+                    4,
+                    10
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon_font",
+                      "id": "hCdF1",
+                      "name": "deviceIcon",
+                      "width": 14,
+                      "height": 14,
+                      "iconFontName": "monitor",
+                      "iconFontFamily": "lucide",
+                      "fill": "#EF4444"
+                    },
+                    {
+                      "type": "text",
+                      "id": "Hj5H9",
+                      "name": "deviceCount",
+                      "fill": "#EF4444",
+                      "content": "3",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "700"
+                    }
+                  ]
+                }
+              ]
             }
           ]
         },
@@ -65,46 +140,137 @@
           "alignItems": "center",
           "children": [
             {
-              "type": "ellipse",
-              "id": "su26P",
-              "name": "button_outer",
-              "fill": "#1E293B",
-              "width": 140,
-              "height": 140,
-              "stroke": {
-                "thickness": 2,
-                "fill": "#22D3EE"
-              }
-            },
-            {
               "type": "frame",
               "id": "aSYzF",
               "name": "status_frame",
               "layout": "vertical",
-              "gap": 8,
+              "gap": 32,
               "alignItems": "center",
               "children": [
                 {
                   "type": "text",
                   "id": "sdX8r",
                   "name": "status_value",
-                  "fill": "#22D3EE",
-                  "content": "CONNECTED TO MAC MINI",
+                  "fill": "#94A3B8",
+                  "content": "CONNECTED TO MAC",
                   "fontFamily": "JetBrains Mono",
                   "fontSize": 12,
                   "fontWeight": "600",
-                  "letterSpacing": 1
+                  "letterSpacing": 2
+                },
+                {
+                  "type": "frame",
+                  "id": "lM9JP",
+                  "name": "mic_container",
+                  "width": 140,
+                  "height": 140,
+                  "layout": "none",
+                  "children": [
+                    {
+                      "type": "ellipse",
+                      "id": "su26P",
+                      "x": 0,
+                      "y": 0,
+                      "name": "button_outer",
+                      "fill": "#0F172A",
+                      "width": 140,
+                      "height": 140,
+                      "stroke": {
+                        "thickness": 2,
+                        "fill": "#22D3EE"
+                      }
+                    },
+                    {
+                      "type": "icon_font",
+                      "id": "zWMkx",
+                      "x": 46,
+                      "y": 46,
+                      "name": "micIcon",
+                      "width": 48,
+                      "height": 48,
+                      "iconFontName": "mic",
+                      "iconFontFamily": "lucide",
+                      "fill": "#22D3EE"
+                    }
+                  ]
                 },
                 {
                   "type": "text",
-                  "id": "e5Sbn",
-                  "name": "status_detail",
-                  "fill": "#64748B",
-                  "content": "ready to sync",
+                  "id": "W2FWa",
+                  "name": "listening_label",
+                  "fill": "#22D3EE",
+                  "content": "LISTENING...",
                   "fontFamily": "JetBrains Mono",
-                  "fontSize": 11
+                  "fontSize": 14,
+                  "fontWeight": "600",
+                  "letterSpacing": 2
                 }
               ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "Q1hJG",
+          "name": "history_section",
+          "width": "fill_container",
+          "layout": "vertical",
+          "gap": 12,
+          "padding": [
+            0,
+            24
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "3u141",
+              "name": "historyLabel",
+              "fill": "#64748B",
+              "content": "HISTORY",
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fontWeight": "600",
+              "letterSpacing": 2
+            },
+            {
+              "type": "text",
+              "id": "iIuvj",
+              "name": "h1",
+              "fill": "#FFFFFF",
+              "content": "第二个界面上面变成一个返回按钮哎呀",
+              "fontFamily": "JetBrains Mono",
+              "fontSize": 13,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "E5ERU",
+              "name": "h2",
+              "fill": "#FFFFFF",
+              "content": "根据这个需求现在拍摄中画出UI设计",
+              "fontFamily": "JetBrains Mono",
+              "fontSize": 13,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "qLtkO",
+              "name": "h3",
+              "fill": "#FFFFFF",
+              "content": "喂喂喂现在开始测试功能",
+              "fontFamily": "JetBrains Mono",
+              "fontSize": 13,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "NlnDG",
+              "name": "h4",
+              "fill": "#FFFFFF",
+              "content": "喂喂现在开始唱日功能",
+              "fontFamily": "JetBrains Mono",
+              "fontSize": 13,
+              "fontWeight": "normal"
             }
           ]
         },
@@ -114,10 +280,26 @@
           "name": "transcription_bg",
           "width": "fill_container",
           "fill": "#0F172A",
+          "cornerRadius": [
+            16,
+            16,
+            0,
+            0
+          ],
           "layout": "vertical",
           "gap": 12,
           "padding": 24,
           "children": [
+            {
+              "type": "icon_font",
+              "id": "e2SpG",
+              "name": "menuIcon",
+              "width": 16,
+              "height": 16,
+              "iconFontName": "menu",
+              "iconFontFamily": "lucide",
+              "fill": "#64748B"
+            },
             {
               "type": "text",
               "id": "Y7Uun",
@@ -133,20 +315,13 @@
               "type": "text",
               "id": "7qS1Y",
               "name": "text_t",
-              "fill": "#FFFFFF",
+              "fill": "#22C55E",
               "textGrowth": "fixed-width",
               "width": "fill_container",
-              "content": "The quick brown fox jumps over the lazy dog...",
+              "content": "我现在在实际代码功能中添加了两个功能一个是在录音下方添加了历史绘画记录功能然后文字模板有绿色表示发送成功",
               "fontFamily": "JetBrains Mono",
-              "fontSize": 14
-            },
-            {
-              "type": "rectangle",
-              "id": "hBLy5",
-              "name": "cursor",
-              "fill": "#22D3EE",
-              "width": 8,
-              "height": 16
+              "fontSize": 14,
+              "fontWeight": "normal"
             }
           ]
         }
@@ -155,8 +330,8 @@
     {
       "type": "frame",
       "id": "1VIet",
-      "x": 440,
-      "y": 126,
+      "x": -3,
+      "y": -368,
       "name": "Mac Menu Bar Host",
       "clip": true,
       "width": 200,
@@ -312,8 +487,8 @@
     {
       "type": "frame",
       "id": "3YmpQ",
-      "x": 440,
-      "y": 9,
+      "x": -3,
+      "y": -467,
       "name": "Mac Menu Bar",
       "width": 200,
       "height": 32,
@@ -344,6 +519,405 @@
           "fontSize": 10,
           "fontWeight": "700",
           "letterSpacing": 1
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "FmSgu",
+      "x": 421,
+      "y": 0,
+      "name": "mDNS Selection",
+      "clip": true,
+      "width": 393,
+      "height": 852,
+      "fill": "#0A0F1C",
+      "layout": "vertical",
+      "children": [
+        {
+          "type": "frame",
+          "id": "6wrO8",
+          "name": "header",
+          "width": "fill_container",
+          "height": 60,
+          "padding": [
+            0,
+            24
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "3PXi3",
+              "name": "back_button",
+              "gap": 6,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon_font",
+                  "id": "W5m2E",
+                  "name": "backIcon",
+                  "width": 24,
+                  "height": 24,
+                  "iconFontName": "chevron-left",
+                  "iconFontFamily": "lucide",
+                  "fill": "#22D3EE"
+                },
+                {
+                  "type": "text",
+                  "id": "RhwOU",
+                  "name": "backText",
+                  "fill": "#22D3EE",
+                  "content": "返回",
+                  "fontFamily": "Inter",
+                  "fontSize": 16,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "Jp1SR",
+              "name": "headerTitle",
+              "fill": "#FFFFFF",
+              "content": "选择设备",
+              "fontFamily": "Inter",
+              "fontSize": 18,
+              "fontWeight": "600"
+            },
+            {
+              "type": "frame",
+              "id": "Skhga",
+              "name": "spacer",
+              "width": 60,
+              "height": 1
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "yU8oL",
+          "name": "main_area",
+          "width": "fill_container",
+          "height": "fill_container",
+          "layout": "vertical",
+          "gap": 24,
+          "padding": [
+            0,
+            24
+          ],
+          "justifyContent": "center",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon_font",
+              "id": "qO8og",
+              "name": "scanIcon",
+              "width": 48,
+              "height": 48,
+              "iconFontName": "wifi",
+              "iconFontFamily": "lucide",
+              "fill": "#22D3EE"
+            },
+            {
+              "type": "text",
+              "id": "SdouG",
+              "name": "scanTitle",
+              "fill": "#FFFFFF",
+              "content": "发现以下设备",
+              "fontFamily": "Inter",
+              "fontSize": 20,
+              "fontWeight": "600"
+            },
+            {
+              "type": "text",
+              "id": "V445k",
+              "name": "scanSubtitle",
+              "fill": "#64748B",
+              "content": "选择要连接的 Mac",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "frame",
+              "id": "UoegF",
+              "name": "device_list",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 12,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "3kGA0",
+                  "name": "device_item_1",
+                  "width": "fill_container",
+                  "height": 72,
+                  "fill": "#1E293B",
+                  "cornerRadius": 12,
+                  "stroke": {
+                    "thickness": 1,
+                    "fill": "#334155"
+                  },
+                  "gap": 16,
+                  "padding": [
+                    0,
+                    16
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon_font",
+                      "id": "T0S10",
+                      "name": "icon1",
+                      "width": 28,
+                      "height": 28,
+                      "iconFontName": "monitor",
+                      "iconFontFamily": "lucide",
+                      "fill": "#22D3EE"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "zPET6",
+                      "name": "text_col",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 4,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "aJfGi",
+                          "name": "name1",
+                          "fill": "#FFFFFF",
+                          "content": "Mac Mini 办公室",
+                          "fontFamily": "Inter",
+                          "fontSize": 16,
+                          "fontWeight": "500"
+                        },
+                        {
+                          "type": "text",
+                          "id": "cMcUp",
+                          "name": "addr1",
+                          "fill": "#64748B",
+                          "content": "chengjinyudeMac-mini.local.:8888",
+                          "fontFamily": "JetBrains Mono",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "icon_font",
+                      "id": "zWzWN",
+                      "name": "chevron1",
+                      "width": 20,
+                      "height": 20,
+                      "iconFontName": "chevron-right",
+                      "iconFontFamily": "lucide",
+                      "fill": "#475569"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "WNXjQ",
+                  "name": "device_item_2",
+                  "width": "fill_container",
+                  "height": 72,
+                  "fill": "#1E293B",
+                  "cornerRadius": 12,
+                  "stroke": {
+                    "thickness": 1,
+                    "fill": "#334155"
+                  },
+                  "gap": 16,
+                  "padding": [
+                    0,
+                    16
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon_font",
+                      "id": "0mwuu",
+                      "name": "icon2",
+                      "width": 28,
+                      "height": 28,
+                      "iconFontName": "laptop",
+                      "iconFontFamily": "lucide",
+                      "fill": "#22D3EE"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "JhgKh",
+                      "name": "text_col_2",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 4,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "CLQit",
+                          "name": "name2",
+                          "fill": "#FFFFFF",
+                          "content": "MacBook Pro",
+                          "fontFamily": "Inter",
+                          "fontSize": 16,
+                          "fontWeight": "500"
+                        },
+                        {
+                          "type": "text",
+                          "id": "dNiei",
+                          "name": "addr2",
+                          "fill": "#64748B",
+                          "content": "joes-macbook.local.:8888",
+                          "fontFamily": "JetBrains Mono",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "icon_font",
+                      "id": "HOMbK",
+                      "name": "chevron2",
+                      "width": 20,
+                      "height": 20,
+                      "iconFontName": "chevron-right",
+                      "iconFontFamily": "lucide",
+                      "fill": "#475569"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "gaBEZ",
+                  "name": "device_item_3",
+                  "width": "fill_container",
+                  "height": 72,
+                  "fill": "#1E293B",
+                  "cornerRadius": 12,
+                  "stroke": {
+                    "thickness": 1,
+                    "fill": "#334155"
+                  },
+                  "gap": 16,
+                  "padding": [
+                    0,
+                    16
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon_font",
+                      "id": "mxw8a",
+                      "name": "icon3",
+                      "width": 28,
+                      "height": 28,
+                      "iconFontName": "monitor",
+                      "iconFontFamily": "lucide",
+                      "fill": "#22D3EE"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "nwNZB",
+                      "name": "text_col_3",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 4,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "lRVg2",
+                          "name": "name3",
+                          "fill": "#FFFFFF",
+                          "content": "iMac 会议室",
+                          "fontFamily": "Inter",
+                          "fontSize": 16,
+                          "fontWeight": "500"
+                        },
+                        {
+                          "type": "text",
+                          "id": "hTqFy",
+                          "name": "addr3",
+                          "fill": "#64748B",
+                          "content": "conference-imac.local.:8888",
+                          "fontFamily": "JetBrains Mono",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "icon_font",
+                      "id": "dq1yw",
+                      "name": "chevron3",
+                      "width": 20,
+                      "height": 20,
+                      "iconFontName": "chevron-right",
+                      "iconFontFamily": "lucide",
+                      "fill": "#475569"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "R5z8v",
+              "name": "scan_status",
+              "gap": 8,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "ellipse",
+                  "id": "rucy3",
+                  "name": "scanDot",
+                  "fill": "#22D3EE",
+                  "width": 8,
+                  "height": 8
+                },
+                {
+                  "type": "text",
+                  "id": "kXmFv",
+                  "name": "scanText",
+                  "fill": "#64748B",
+                  "content": "正在扫描...",
+                  "fontFamily": "Inter",
+                  "fontSize": 13,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "j6ZmM",
+              "name": "cancel_button",
+              "width": "fill_container",
+              "height": 48,
+              "fill": "#1E293B",
+              "cornerRadius": 12,
+              "stroke": {
+                "thickness": 1,
+                "fill": "#475569"
+              },
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "eN9wx",
+                  "name": "cancelText",
+                  "fill": "#94A3B8",
+                  "content": "取消",
+                  "fontFamily": "Inter",
+                  "fontSize": 16,
+                  "fontWeight": "500"
+                }
+              ]
+            }
+          ]
         }
       ]
     }
