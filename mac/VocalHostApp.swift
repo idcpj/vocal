@@ -8,12 +8,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
     var connectedConnection: NWConnection?
     var heartbeatTimer: Timer?
     var lastInjectedText: String = ""  // Track what's been typed to compute delta
+    var menuStatusText: String = "Starting..." {
+        didSet { updateMenu() }
+    }
     var isConnected: Bool = false {
         didSet {
-            updateMenu()
             if isConnected {
+                menuStatusText = "✅ Connected"
                 startHeartbeat()
             } else {
+                menuStatusText = "⏳ Waiting for connection..."
                 stopHeartbeat()
             }
         }
@@ -39,10 +43,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
     func updateMenu() {
         let menu = NSMenu()
         
-        let statusText = isConnected ? "Status: Connected" : "Status: Waiting for discovery..."
-        let statusItemMenu = NSMenuItem(title: statusText, action: nil, keyEquivalent: "")
-        statusItemMenu.isEnabled = false
-        menu.addItem(statusItemMenu)
+        let statusMenuItem = NSMenuItem(title: menuStatusText, action: nil, keyEquivalent: "")
+        statusMenuItem.isEnabled = false
+        menu.addItem(statusMenuItem)
         
         menu.addItem(NSMenuItem.separator())
         
@@ -68,6 +71,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
                 switch state {
                 case .ready:
                     print("WebSocket Server ready on port 8888")
+                    self.menuStatusText = "📡 Advertising..."
                     self.startAdvertising()
                 case .failed(let error):
                     print("Server failed: \(error)")
@@ -167,7 +171,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
     
     func startAdvertising() {
         print("Starting mDNS advertising...")
-        netService = NetService(domain: "local.", type: "_vocal._tcp", name: "VocalHost", port: 8888)
+        let hostName = Host.current().localizedName ?? "VocalHost"
+        netService = NetService(domain: "local.", type: "_vocal._tcp", name: hostName, port: 8888)
         netService?.delegate = self
         netService?.publish()
     }
