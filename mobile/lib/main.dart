@@ -138,22 +138,23 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
 
   Widget _buildDeviceCountBadge() {
     final count = _ctrl.discoveredServices.length;
+    const badgeColor = Color(0xFFEAB308); // Amber/Yellow
     return GestureDetector(
       onTap: _navigateToDeviceSelection,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: Colors.red.withValues(alpha: 0.15),
+          color: badgeColor.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           children: [
-            const Icon(Icons.computer, color: Colors.red, size: 14),
+            const Icon(Icons.computer, color: badgeColor, size: 14),
             const SizedBox(width: 4),
             Text(
               '$count',
               style: const TextStyle(
-                color: Colors.red,
+                color: badgeColor,
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
               ),

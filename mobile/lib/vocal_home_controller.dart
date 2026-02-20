@@ -72,6 +72,10 @@ class VocalHomeController extends ChangeNotifier {
   // ─── mDNS Discovery ─────────────────────────────────────
 
   Future<void> discoverServices() async {
+    // Guard: skip if already connected or discovery in progress
+    if (_isConnected) return;
+    if (_activeDiscovery != null) return;
+
     try {
       _discoveredServices.clear();
       _statusText = 'Scanning for Mac...';
