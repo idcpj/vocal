@@ -176,8 +176,7 @@ class VocalHomeController extends ChangeNotifier {
 
   Future<void> startListening() async {
     _wantsListening = true;
-    _lastWords = '';
-    _lastSentWords = '';
+
     notifyListeners();
     await _beginListenSession();
   }
@@ -186,6 +185,8 @@ class VocalHomeController extends ChangeNotifier {
     _wantsListening = false;
     _debounceTimer?.cancel();
     await _speechToText.stop();
+    _lastWords = '';
+    _lastSentWords = '';
     notifyListeners();
   }
 
