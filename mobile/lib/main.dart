@@ -164,9 +164,13 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
 
   Widget _buildMicButton() {
     return GestureDetector(
-      onTapDown: (_) => _ctrl.startListening(),
-      onTapUp: (_) => _ctrl.stopListening(),
-      onTapCancel: () => _ctrl.stopListening(),
+      onTap: () {
+        if (_ctrl.isListening) {
+          _ctrl.stopListening();
+        } else {
+          _ctrl.startListening();
+        }
+      },
       child: AnimatedBuilder(
         animation: _animController,
         builder: (context, child) {

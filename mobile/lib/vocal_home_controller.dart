@@ -26,6 +26,7 @@ class VocalHomeController extends ChangeNotifier {
   String _lastSentWords = '';
   final List<String> _historyList = [];
   Timer? _debounceTimer;
+  bool _wantsListening = false; // Toggle state: user wants continuous listening
 
   bool get isListening => _speechToText.isListening;
   String get lastWords => _lastWords;
@@ -174,10 +175,22 @@ class VocalHomeController extends ChangeNotifier {
   // ─── Listening (STT) ────────────────────────────────────
 
   Future<void> startListening() async {
+    _wantsListening = true;
     _lastWords = '';
     _lastSentWords = '';
     notifyListeners();
+    await _beginListenSession();
+  }
 
+  Future<void> stopListening() async {
+    _wantsListening = false;
+    _debounceTimer?.cancel();
+    await _speechToText.stop();
+    notifyListeners();
+  }
+
+  /// Internal: start a single STT listen session.
+  Future<void> _beginListenSession() async {
     await _speechToText.listen(
       onResult: _onSpeechResult,
       localeId: _selectedLocaleId,
@@ -185,19 +198,14 @@ class VocalHomeController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> stopListening() async {
-    await _speechToText.stop();
-    notifyListeners();
-  }
-
   // ─── Speech Result Handling (Debounce) ─────────────────────
 
-  void _onSpeechResult(SpeechRecognitionResult result) {
+  void _onSpeechResult(SpeechRecognitionResult result) async {
     final newWords = result.recognizedWords;
     _lastWords = newWords;
     notifyListeners();
 
-    // Final result: save to history, flush immediately, done.
+    // Final result: save to history, flush, then auto-restart if wanted.
     if (result.finalResult) {
       _debounceTimer?.cancel();
       if (newWords.trim().isNotEmpty) {
@@ -208,6 +216,15 @@ class VocalHomeController extends ChangeNotifier {
         notifyListeners();
       }
       debugPrint('Final sent: "$newWords"');
+
+      // Auto-restart: user still wants to listen (toggle mode)
+      if (_wantsListening) {
+        _lastWords = '';
+        _lastSentWords = '';
+        notifyListeners();
+        await Future.delayed(const Duration(milliseconds: 100));
+        await _beginListenSession();
+      }
       return;
     }
 
