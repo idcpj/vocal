@@ -42,3 +42,6 @@ Follows the **Terminal × Minimal** aesthetic:
 - **Dark Mode**: High-contrast slate and electric cyan.
 - **Typography**: JetBrains Mono and Inter.
 - **UI**: Single "Push to Talk" interaction with live transcription feedback.
+
+## 📋 TODO
+- [ ] mDNS 发现服务后，弹出列表供用户选择目标 Mac 名称（而非自动连接第一个）

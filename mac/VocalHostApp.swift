@@ -7,6 +7,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
     var listener: NWListener?
     var connectedConnection: NWConnection?
     var heartbeatTimer: Timer?
+    var lastInjectedText: String = ""  // Track what's been typed to compute delta
     var isConnected: Bool = false {
         didSet {
             updateMenu()
@@ -82,6 +83,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
                     case .ready:
                         print("WebSocket connection established and ready.")
                         self.connectedConnection = connection
+                        self.lastInjectedText = ""  // Reset for new session
                         self.receive(on: connection)
                         DispatchQueue.main.async {
                             self.isConnected = true
@@ -111,24 +113,38 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
     
     func receive(on connection: NWConnection) {
         connection.receiveMessage { [weak self] (data, context, isComplete, error) in
+            guard let self = self else { return }
             if let data = data, !data.isEmpty {
                 if let message = String(data: data, encoding: .utf8) {
-                    print("Received Message: \(message)")
                     if message.contains("\"type\":\"pong\"") || message.contains("\"type\": \"pong\"") {
                         print("Heartbeat pong received.")
                     } else if !message.contains("\"type\":") {
-                        // Only inject text if it's NOT a JSON control message
-                        self?.injectText(message)
+                        // message = full recognized text from mobile
+                        let fullText = message
+                        let lastText = self.lastInjectedText
+                        
+                        if fullText.hasPrefix(lastText) {
+                            // Strict extension — only inject the new suffix
+                            let delta = String(fullText.dropFirst(lastText.count))
+                            if !delta.isEmpty {
+                                print("Injecting: \(delta)")
+                                self.injectText(delta)
+                            }
+                        } else {
+                            // Engine corrected earlier text — can't un-type, skip injection
+                            print("Correction detected, tracking updated silently")
+                        }
+                        self.lastInjectedText = fullText
                     }
                 }
             }
             
             if error == nil {
-                self?.receive(on: connection)
+                self.receive(on: connection)
             } else {
                 print("Receive error or closure: \(String(describing: error))")
                 DispatchQueue.main.async {
-                    self?.isConnected = false
+                    self.isConnected = false
                 }
             }
         }
