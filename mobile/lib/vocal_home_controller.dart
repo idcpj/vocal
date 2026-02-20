@@ -16,8 +16,14 @@ class VocalHomeController extends ChangeNotifier {
   String _statusText = 'Searching for Mac...';
   DateTime? _lastHeartbeat;
 
+  // ─── Device Discovery ────────────────────────────────────
+  final List<nsd.Service> _discoveredServices = [];
+  nsd.Discovery? _activeDiscovery;
+
   bool get isConnected => _isConnected;
   String get statusText => _statusText;
+  List<nsd.Service> get discoveredServices =>
+      List.unmodifiable(_discoveredServices);
 
   // ─── Speech-to-Text ──────────────────────────────────────
   final SpeechToText _speechToText = SpeechToText();
@@ -67,34 +73,57 @@ class VocalHomeController extends ChangeNotifier {
 
   Future<void> discoverServices() async {
     try {
+      _discoveredServices.clear();
       _statusText = 'Scanning for Mac...';
       notifyListeners();
 
       final discovery = await nsd.startDiscovery('_vocal._tcp');
+      _activeDiscovery = discovery;
       discovery.addListener(() {
-        if (discovery.services.isEmpty) {
-          _statusText = 'No Mac found yet...';
-          notifyListeners();
-          return;
-        }
-
         for (final service in discovery.services) {
-          debugPrint(
-            'Discovered: ${service.name} (${service.host}:${service.port})',
-          );
-          if (service.host != null && service.port != null && !_isConnected) {
-            _connectToMac(service.host!, service.port!);
-            nsd.stopDiscovery(discovery);
-            break;
-          } else {
-            _statusText = 'Found ${service.name}, resolving...';
-            notifyListeners();
+          // Skip duplicates (by name)
+          if (_discoveredServices.any((s) => s.name == service.name)) continue;
+          if (service.host != null && service.port != null) {
+            _discoveredServices.add(service);
+            debugPrint(
+              'Discovered: ${service.name} (${service.host}:${service.port})',
+            );
           }
         }
+        if (_discoveredServices.isEmpty) {
+          _statusText = 'No Mac found yet...';
+        } else if (_discoveredServices.length == 1 && !_isConnected) {
+          // Auto-connect when only one device found
+          connectToService(_discoveredServices.first);
+          return;
+        } else {
+          _statusText = 'Found ${_discoveredServices.length} device(s)';
+        }
+        notifyListeners();
       });
     } catch (e) {
       _statusText = 'Discovery error: $e';
       notifyListeners();
+    }
+  }
+
+  /// Connect to a user-selected service from the discovered list.
+  void connectToService(nsd.Service service) {
+    // Defer stop so it doesn't fire inside the discovery listener callback
+    Future.microtask(() => stopDiscovery());
+    _connectToMac(service.host!, service.port!);
+  }
+
+  /// Stop active mDNS discovery.
+  void stopDiscovery() {
+    final d = _activeDiscovery;
+    _activeDiscovery = null;
+    if (d != null) {
+      try {
+        nsd.stopDiscovery(d);
+      } catch (e) {
+        debugPrint('stopDiscovery error (ignored): $e');
+      }
     }
   }
 

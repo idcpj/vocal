@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'vocal_home_controller.dart';
+import 'device_selection_page.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -94,7 +95,15 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
               letterSpacing: 2,
             ),
           ),
-          _buildConnectionBadge(),
+          Row(
+            children: [
+              _buildConnectionBadge(),
+              if (_ctrl.discoveredServices.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                _buildDeviceCountBadge(),
+              ],
+            ],
+          ),
         ],
       ),
     );
@@ -123,6 +132,43 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildDeviceCountBadge() {
+    final count = _ctrl.discoveredServices.length;
+    return GestureDetector(
+      onTap: _navigateToDeviceSelection,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.red.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.computer, color: Colors.red, size: 14),
+            const SizedBox(width: 4),
+            Text(
+              '$count',
+              style: const TextStyle(
+                color: Colors.red,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _navigateToDeviceSelection() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => DeviceSelectionPage(controller: _ctrl),
       ),
     );
   }
