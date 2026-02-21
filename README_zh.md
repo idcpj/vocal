@@ -38,16 +38,18 @@ Vocal 将您的 iPhone 转换为专业的远程语音输入设备。它利用苹
 
 宿主程序运行在菜单栏中，负责接收来自手机的文本。
 
-**编译并启动:**
-```bash
-# 在项目根目录下执行
-swiftc -o VocalHost mac/VocalHostApp.swift -parse-as-library
-./VocalHost &
-```
+**安装步骤:**
+1. **构建 DMG**:
+   ```bash
+   ./mac/build_macos.sh
+   ```
+2. **安装**: 打开 `build_macos/VocalHost.dmg` 并将 **VocalHost** 拖入 **Applications (应用程序)** 文件夹。
+3. **启动**: 从应用程序文件夹或 Spotlight 搜索并启动 VocalHost。
 
 **权限设置:**
 - 点击菜单栏中的 **Vocal 图标**。
 - 确保已授予 **辅助功能 (Accessibility)** 权限 (`系统设置 > 隐私与安全性 > 辅助功能`)。
+- **注意**: 由于是自行构建的应用，如果系统提示“无法确认开发者”，请在应用程序文件夹中**右键点击** VocalHost 并选择“打开”。
 
 ### 2. iPhone 客户端设置
 

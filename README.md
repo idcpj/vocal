@@ -38,16 +38,18 @@ Vocal turns your iPhone into a professional-grade remote voice input device. It 
 
 The host application runs in your menu bar and acts as the receiver.
 
-**Build and Launch:**
-```bash
-# From the project root
-swiftc -o VocalHost mac/VocalHostApp.swift -parse-as-library
-./VocalHost &
-```
+**Installation:**
+1. **Build the DMG**:
+   ```bash
+   ./mac/build_macos.sh
+   ```
+2. **Install**: Open `build_macos/VocalHost.dmg` and drag **VocalHost** to your **Applications** folder.
+3. **Launch**: Open VocalHost from your Applications or Spotlight.
 
 **Permissions:**
 - Click the **Vocal icon** in your menu bar.
 - Ensure **Accessibility** permissions are granted (`System Settings > Privacy & Security > Accessibility`).
+- Since it's an ad-hoc signed app: if macOS warns about an "unidentified developer", right-click the app in Applications and select **Open**.
 
 ### 2. iPhone Client Setup
 
