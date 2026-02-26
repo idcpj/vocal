@@ -15,9 +15,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
         didSet {
             if isConnected {
                 menuStatusText = "✅ Connected"
+                updateIcon(connected: true)
                 startHeartbeat()
             } else {
                 menuStatusText = "⏳ Waiting for connection..."
+                updateIcon(connected: false)
                 stopHeartbeat()
             }
         }
@@ -30,7 +32,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         
         if let button = statusItem?.button {
-            button.image = NSImage(systemSymbolName: "mic.fill", accessibilityDescription: "Vocal Host")
+            // Default to disconnected icon state
+            updateIcon(connected: false)
         }
         
         updateMenu()
@@ -38,6 +41,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
         
         // Bring to front if needed, but since it's an accessory app, it stays in the menu bar
         NSApp.activate(ignoringOtherApps: true)
+    }
+    
+    func updateIcon(connected: Bool) {
+        if let button = statusItem?.button {
+            let config = NSImage.SymbolConfiguration(pointSize: 15, weight: .regular)
+            let colorConfig = NSImage.SymbolConfiguration(hierarchicalColor: connected ? NSColor.systemGreen : NSColor.labelColor)
+            let combined = config.applying(colorConfig)
+            button.image = NSImage(systemSymbolName: connected ? "mic.fill" : "mic", accessibilityDescription: "Vocal Host")?.withSymbolConfiguration(combined)
+        }
     }
     
     func updateMenu() {

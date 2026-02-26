@@ -133,7 +133,7 @@ class VocalHomeController extends ChangeNotifier {
 
   // ─── WebSocket Connection ────────────────────────────────
 
-  void _connectToMac(String host, int port) {
+  Future<void> _connectToMac(String host, int port) async {
     try {
       final wsUrl = 'ws://$host:$port';
       debugPrint('Attempting connection to $wsUrl');
@@ -141,6 +141,8 @@ class VocalHomeController extends ChangeNotifier {
       notifyListeners();
 
       _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
+
+      await _channel!.ready;
 
       _channel!.stream.listen(
         (message) {
