@@ -76,10 +76,7 @@ graph LR
     B -- AXUIElement (文字注入) --> C[活跃的 macOS 应用]
 ```
 
-## 📋 路线图
-- [ ] mDNS 设备选择列表 (进行中)
-- [ ] 多语言实时切换支持
-- [ ] 通过 Mac 键盘快捷键触发录音 (Push-to-Talk)
+
 
 ## 📄 开源协议
 MIT License - Copyright (c) 2026 Vocal Contributors

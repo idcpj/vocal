@@ -7,7 +7,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
     var listener: NWListener?
     var connectedConnection: NWConnection?
     var heartbeatTimer: Timer?
-    var lastInjectedText: String = ""  // Track what's been typed to compute delta
     var menuStatusText: String = "Starting..." {
         didSet { updateMenu() }
     }
@@ -99,7 +98,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
                     case .ready:
                         print("WebSocket connection established and ready.")
                         self.connectedConnection = connection
-                        self.lastInjectedText = ""  // Reset for new session
                         self.receive(on: connection)
                         DispatchQueue.main.async {
                             self.isConnected = true
@@ -135,22 +133,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
                     if message.contains("\"type\":\"pong\"") || message.contains("\"type\": \"pong\"") {
                         print("Heartbeat pong received.")
                     } else if !message.contains("\"type\":") {
-                        // message = full recognized text from mobile
+                        // message = full recognized string from mobile (one whole sentence sent at once)
                         let fullText = message
-                        let lastText = self.lastInjectedText
-                        
-                        if fullText.hasPrefix(lastText) {
-                            // Strict extension — only inject the new suffix
-                            let delta = String(fullText.dropFirst(lastText.count))
-                            if !delta.isEmpty {
-                                print("Injecting: \(delta)")
-                                self.injectText(delta)
-                            }
-                        } else {
-                            // Engine corrected earlier text — can't un-type, skip injection
-                            print("Correction detected, tracking updated silently")
+                        if !fullText.isEmpty {
+                            print("Injecting: \(fullText)")
+                            self.injectText(fullText)
                         }
-                        self.lastInjectedText = fullText
                     }
                 }
             }

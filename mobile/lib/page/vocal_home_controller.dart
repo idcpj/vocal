@@ -33,6 +33,7 @@ class VocalHomeController extends ChangeNotifier {
   final List<String> _historyList = [];
   Timer? _debounceTimer;
   bool _wantsListening = false; // Toggle state: user wants continuous listening
+  bool _isStartingSession = false; // Guard against parallel restarts
 
   bool get isListening => _speechToText.isListening;
   String get lastWords => _lastWords;
@@ -55,7 +56,25 @@ class VocalHomeController extends ChangeNotifier {
   // ─── Speech Init ─────────────────────────────────────────
 
   Future<void> _initSpeech() async {
-    bool available = await _speechToText.initialize();
+    bool available = await _speechToText.initialize(
+      onStatus: (status) {
+        debugPrint('STT Status: $status');
+        // Safety net: if engine stops unexpectedly while user still wants listening
+        if (status == 'done' && _wantsListening) {
+          Future.delayed(const Duration(milliseconds: 100), () {
+            if (_wantsListening &&
+                !_speechToText.isListening &&
+                !_isStartingSession) {
+              debugPrint('Engine stopped, restarting cleanly...');
+              _beginListenSession();
+            }
+          });
+        }
+      },
+      onError: (error) {
+        debugPrint('STT Error: $error');
+      },
+    );
     if (available) {
       final locales = await _speechToText.locales();
       for (var locale in locales) {
@@ -226,12 +245,29 @@ class VocalHomeController extends ChangeNotifier {
   }
 
   /// Internal: start a single STT listen session.
+  /// Uses dictation mode so the engine stays open and fires finalResult
+  /// for each completed sentence without stopping.
   Future<void> _beginListenSession() async {
-    await _speechToText.listen(
-      onResult: _onSpeechResult,
-      localeId: _selectedLocaleId,
-    );
-    notifyListeners();
+    if (_isStartingSession) return;
+    _isStartingSession = true;
+
+    try {
+      // Defensive delay for iOS 26 to ensure AVAudioSession is ready and stable
+      await Future.delayed(const Duration(milliseconds: 400));
+
+      if (!_wantsListening) return; // Checked again after delay
+
+      await _speechToText.listen(
+        onResult: _onSpeechResult,
+        localeId: _selectedLocaleId,
+        listenMode: ListenMode.dictation,
+        listenFor: const Duration(seconds: 60),
+        cancelOnError: true,
+      );
+    } finally {
+      _isStartingSession = false;
+      notifyListeners();
+    }
   }
 
   // ─── Speech Result Handling (Debounce) ─────────────────────
@@ -241,34 +277,41 @@ class VocalHomeController extends ChangeNotifier {
     _lastWords = newWords;
     notifyListeners();
 
-    // Final result: save to history, flush, then auto-restart if wanted.
-    if (result.finalResult) {
-      _debounceTimer?.cancel();
-      if (newWords.trim().isNotEmpty) {
-        _sendToMac(newWords);
-        if (!_historyList.contains(newWords)) {
-          _historyList.insert(0, newWords);
-        }
-        notifyListeners();
-      }
-      debugPrint('Final sent: "$newWords"');
-
-      // Auto-restart: user still wants to listen (toggle mode)
-      if (_wantsListening) {
-        _lastWords = '';
-        _lastSentWords = '';
-        notifyListeners();
-        await Future.delayed(const Duration(milliseconds: 100));
-        await _beginListenSession();
-      }
-      return;
+    // Reset debounce timer on every result
+    _debounceTimer?.cancel();
+    if (newWords.trim().isNotEmpty) {
+      _debounceTimer = Timer(const Duration(milliseconds: 900), () {
+        debugPrint('Silence detected, auto-finalizing: "$newWords"');
+        _finalizeSentence(newWords);
+      });
     }
 
-    // Partial result: debounce 300ms — wait for speech to pause.
-    _debounceTimer?.cancel();
-    _debounceTimer = Timer(const Duration(milliseconds: 300), () {
-      _sendToMac(newWords);
-    });
+    // Official final result: handle immediately
+    if (result.finalResult) {
+      _debounceTimer?.cancel();
+      _finalizeSentence(newWords);
+    }
+  }
+
+  /// Finalize the current sentence: send to Mac, add to history, and restart listener.
+  void _finalizeSentence(String words) {
+    final trimmed = words.trim();
+    if (trimmed.isEmpty) return;
+
+    // Send to Mac and update history
+    _sendToMac(trimmed);
+    if (!_historyList.contains(trimmed)) {
+      _historyList.insert(0, trimmed);
+    }
+
+    // Clear local transient state
+    _lastWords = '';
+    _lastSentWords = '';
+
+    // Stop the engine. The onStatus listener will detect 'done' and restart
+    // because _wantsListening is still true.
+    _speechToText.stop();
+    notifyListeners();
   }
 
   /// Send full recognized text to Mac. Mac handles delta calculation.

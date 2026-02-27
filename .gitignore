@@ -1,4 +1,7 @@
-.DS_Store
 VocalHost
 *.log
 *.dmg
+.DS_Store
+
+# FVM Version Cache
+.fvm/
