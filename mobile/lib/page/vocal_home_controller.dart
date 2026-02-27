@@ -30,6 +30,14 @@ class VocalHomeController extends ChangeNotifier {
   String? _selectedLocaleId;
   String _lastWords = '';
   String _lastSentWords = '';
+
+  /// The last recognized sentence that was finalized and sent to Mac.
+  /// Used for deduplication within a single logic flow.
+  String _lastFinalizedText = '';
+
+  /// Guard to prevent parallel finalizations (debounce vs finalResult).
+  bool _isFinalizing = false;
+
   final List<String> _historyList = [];
   Timer? _debounceTimer;
   bool _wantsListening = false; // Toggle state: user wants continuous listening
@@ -251,6 +259,9 @@ class VocalHomeController extends ChangeNotifier {
     if (_isStartingSession) return;
     _isStartingSession = true;
 
+    // Clear session-level deduplication state
+    _lastFinalizedText = '';
+
     try {
       // Defensive delay for iOS 26 to ensure AVAudioSession is ready and stable
       await Future.delayed(const Duration(milliseconds: 400));
@@ -274,12 +285,19 @@ class VocalHomeController extends ChangeNotifier {
 
   void _onSpeechResult(SpeechRecognitionResult result) async {
     final newWords = result.recognizedWords;
+    final trimmed = newWords.trim();
+
+    // Ignore updates that match what we already finalized
+    if (trimmed == _lastFinalizedText && _lastFinalizedText.isNotEmpty) {
+      return;
+    }
+
     _lastWords = newWords;
     notifyListeners();
 
     // Reset debounce timer on every result
     _debounceTimer?.cancel();
-    if (newWords.trim().isNotEmpty) {
+    if (trimmed.isNotEmpty) {
       _debounceTimer = Timer(const Duration(milliseconds: 900), () {
         debugPrint('Silence detected, auto-finalizing: "$newWords"');
         _finalizeSentence(newWords);
@@ -298,6 +316,17 @@ class VocalHomeController extends ChangeNotifier {
     final trimmed = words.trim();
     if (trimmed.isEmpty) return;
 
+    // Guard against parallel finalization (silence debounce vs official finalResult)
+    // or immediate duplicate strings.
+    if (_isFinalizing ||
+        (trimmed == _lastFinalizedText && _lastFinalizedText.isNotEmpty)) {
+      debugPrint('Ignoring duplicate/parallel finalization: "$trimmed"');
+      return;
+    }
+
+    _isFinalizing = true;
+    _lastFinalizedText = trimmed;
+
     // Send to Mac and update history
     _sendToMac(trimmed);
     if (!_historyList.contains(trimmed)) {
@@ -312,6 +341,12 @@ class VocalHomeController extends ChangeNotifier {
     // because _wantsListening is still true.
     _speechToText.stop();
     notifyListeners();
+
+    // Reset the guard after a small "cooling" period to ensure the engine
+    // has actually stopped or transitioned state.
+    Future.delayed(const Duration(milliseconds: 300), () {
+      _isFinalizing = false;
+    });
   }
 
   /// Send full recognized text to Mac. Mac handles delta calculation.
