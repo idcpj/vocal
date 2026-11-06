@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vocal 🎙️ - 基于 iPhone 的 Mac 高速语音录入键盘</title>
+  <meta name="description" content="Vocal 将您的 iPhone 转换为专业的远程语音输入设备。利用 Apple 原生语音听写与极低延迟 WebSocket，在手机端审阅编辑并一键将文字丝滑注入任意 Mac 焦点应用。">
+  <meta name="keywords" content="Vocal, 语音输入, Mac键盘, iPhone语音, SFSpeechRecognizer, WebSocket, 开源软件, 低延迟语音">
+  <link rel="icon" type="image/png" href="images/logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Navigation -->
+  <nav class="navbar" id="navbar">
+    <div class="nav-container">
+      <a href="#" class="nav-logo">
+        <img src="images/logo.png" alt="Vocal Logo" class="logo-img">
+        <span class="logo-text">VOCAL</span>
+        <span class="badge-version">v1.0.0</span>
+      </a>
+
+      <ul class="nav-links">
+        <li><a href="#showcase" class="nav-link">界面预览</a></li>
+        <li><a href="#features" class="nav-link">核心特性</a></li>
+        <li><a href="#architecture" class="nav-link">工作原理</a></li>
+        <li><a href="#download" class="nav-link">快速安装</a></li>
+        <li><a href="#faq" class="nav-link">常见问题</a></li>
+      </ul>
+
+      <div class="nav-actions">
+        <a href="https://github.com/idcpj/vocal" target="_blank" class="btn btn-secondary btn-sm" id="github-star-btn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+          </svg>
+          GitHub
+        </a>
+        <a href="#download" class="btn btn-primary btn-sm" id="nav-download-btn">下载 DMG</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <header class="hero-section">
+    <div class="hero-pill">
+      <span>🎙️</span>
+      <span>基于 iPhone 的 Mac 高速语音录入键盘</span>
+    </div>
+
+    <h1 class="hero-title">
+      把 iPhone 变成 Mac 的<br>
+      <span class="gradient-text">无线超低延迟听写键盘</span>
+    </h1>
+
+    <p class="hero-desc">
+      告别双手敲击键盘的疲劳。借助 Apple 原生高精度听写引擎与局域网极速 WebSocket 流，手机端说话即出文字，自由校验修改，一键将文字无缝注入 Mac 任意光标窗口。
+    </p>
+
+    <div class="hero-ctas">
+      <a href="#download" class="btn btn-primary" id="hero-download-btn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+        下载 macOS 客户端 (DMG)
+      </a>
+      <a href="https://github.com/idcpj/vocal" target="_blank" class="btn btn-secondary" id="hero-view-github-btn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polygon points="10 8 16 12 10 16 10 8"></polygon>
+        </svg>
+        查看源码与 iOS 构建
+      </a>
+    </div>
+
+    <div class="hero-badges">
+      <div class="hero-badge-item">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        <span>极低延迟 (&lt;20ms)</span>
+      </div>
+      <div class="hero-badge-item">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        <span>零云端上传 (纯局域网传输)</span>
+      </div>
+      <div class="hero-badge-item">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        <span>全局适配所有 Mac 应用</span>
+      </div>
+      <div class="hero-badge-item">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        <span>支持数十种系统语言</span>
+      </div>
+    </div>
+
+    <!-- Live Audio Waveform Simulation -->
+    <div class="waveform-container" title="Audio waveform visualization">
+      <div class="wave-bar"></div>
+      <div class="wave-bar"></div>
+      <div class="wave-bar"></div>
+      <div class="wave-bar"></div>
+      <div class="wave-bar"></div>
+      <div class="wave-bar"></div>
+      <div class="wave-bar"></div>
+      <div class="wave-bar"></div>
+    </div>
+  </header>
+
+  <!-- Showcase Section (Dual Device) -->
+  <section class="showcase-section" id="showcase">
+    <div class="section-header">
+      <div class="section-tag">Double Screen Synergy</div>
+      <h2 class="section-title">双端配合，如丝顺滑</h2>
+      <p class="section-desc">手机专精于高精度语音捕获与文字校对，Mac 端静默常驻在菜单栏负责焦点文字注入。</p>
+    </div>
+
+    <div class="showcase-grid">
+      <!-- Phone Client Card -->
+      <div class="showcase-card">
+        <div class="card-header-bar">
+          <div class="device-tag">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+            iPhone 客户端 (Flutter)
+          </div>
+          <div class="status-dot" title="在线就绪"></div>
+        </div>
+        <div class="card-img-wrapper">
+          <img src="images/vocal_mobile_app.png" alt="Vocal iPhone 客户端真实截图" class="showcase-img" id="img-mobile-app">
+        </div>
+        <div class="card-caption">
+          <strong>📱 本地草稿 + 手动发送：</strong> 支持语音听写、软键盘修改错别字、多语言随时切换，点击“发送到 Mac”完成推送。
+        </div>
+      </div>
+
+      <!-- Realtime Flow Pill Badge -->
+      <div class="flow-connector">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="13 17 18 12 13 7"></polyline><polyline points="6 17 11 12 6 7"></polyline></svg>
+        局域网 WebSocket 极速直连
+      </div>
+
+      <!-- Mac Host Card -->
+      <div class="showcase-card">
+        <div class="card-header-bar">
+          <div class="device-tag">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+            macOS 宿主程序 (Swift)
+          </div>
+          <div class="status-dot" title="服务监听中"></div>
+        </div>
+        <div class="card-img-wrapper">
+          <img src="images/vocal_mac_host.png" alt="Vocal Mac 宿主程序菜单栏截图" class="showcase-img" id="img-mac-host">
+        </div>
+        <div class="card-caption">
+          <strong>💻 菜单栏常驻 + 全局输入：</strong> 零 Dock 干扰，支持 mDNS 服务自动广播，通过 Accessibility API 模拟 Unicode 击键。
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features Grid Section -->
+  <section class="features-section" id="features">
+    <div class="section-header">
+      <div class="section-tag">Features</div>
+      <h2 class="section-title">专为极客与创作者打造</h2>
+      <p class="section-desc">每一个细节都为了极致的打字速度、稳定性和隐私安全而设计。</p>
+    </div>
+
+    <div class="features-grid">
+      <!-- Feature 1 -->
+      <div class="feature-box">
+        <div class="feature-icon-wrapper">⚡</div>
+        <h3 class="feature-title">毫秒级低延迟通信</h3>
+        <p class="feature-desc">基于原生 TCP 与轻量 WebSocket 协议，手机与 Mac 在局域网直接点对点建连，传输延迟小于 20ms，体验如同本地物理键盘。</p>
+      </div>
+
+      <!-- Feature 2 -->
+      <div class="feature-box">
+        <div class="feature-icon-wrapper">🍎</div>
+        <h3 class="feature-title">Apple 原生语音识别</h3>
+        <p class="feature-desc">深度集成 iOS <code>SFSpeechRecognizer</code> 听写引擎，充分利用 iPhone 硬件麦克风降噪和端侧神经网络引擎，识别精准度极高。</p>
+      </div>
+
+      <!-- Feature 3 -->
+      <div class="feature-box">
+        <div class="feature-icon-wrapper">🔍</div>
+        <h3 class="feature-title">mDNS 自动零配置组网</h3>
+        <p class="feature-desc">Mac 端通过 Bonjour 自动发布 <code>_vocal._tcp</code> 服务，手机端打开即可自动发现，无需手动查看和输入局域网 IP 地址。</p>
+      </div>
+
+      <!-- Feature 4 -->
+      <div class="feature-box">
+        <div class="feature-icon-wrapper">✍️</div>
+        <h3 class="feature-title">本地草稿与手动发送</h3>
+        <p class="feature-desc">彻底告别实时流式发送导致的文字抖动与撤回冲突！文字在手机端先累加保存，允许从容纠错或继续编辑，确认后再点击发送。</p>
+      </div>
+
+      <!-- Feature 5 -->
+      <div class="feature-box">
+        <div class="feature-icon-wrapper">🌐</div>
+        <h3 class="feature-title">多语言实时无缝切换</h3>
+        <p class="feature-desc">内置普通话、粤语、英语、日语、韩语等数十种语言切换抽屉，一键搜索与更换识别语言，满足跨语言输入需求。</p>
+      </div>
+
+      <!-- Feature 6 -->
+      <div class="feature-box">
+        <div class="feature-icon-wrapper">⌨️</div>
+        <h3 class="feature-title">macOS 全局无障碍注入</h3>
+        <p class="feature-desc">利用 macOS 辅助功能 API（<code>CGEvent</code> Unicode 注入），无论当前活跃窗口是 VS Code、备忘录、微信还是浏览器，皆能瞬间键入。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Architecture Section -->
+  <section class="arch-section" id="architecture">
+    <div class="arch-card">
+      <div class="section-header" style="margin-bottom: 2rem;">
+        <div class="section-tag">How It Works</div>
+        <h2 class="section-title">工作原理与数据流</h2>
+        <p class="section-desc">纯粹、清晰的四步流转流程，全程本地闭环，无外部依赖。</p>
+      </div>
+
+      <div class="arch-steps">
+        <div class="arch-step-item">
+          <div class="step-num">STEP 01</div>
+          <h4 class="step-title">自动发现 & 建连</h4>
+          <p class="step-desc">Mac 端在 8888 端口启动监听并广播 mDNS；iPhone 扫描到后建立 WebSocket 长连接与心跳保活。</p>
+        </div>
+
+        <div class="arch-step-item">
+          <div class="step-num">STEP 02</div>
+          <h4 class="step-title">高精度语音采集</h4>
+          <p class="step-desc">iPhone 调用本地语音识别，将说话声音实时转换为文字草稿，并在手机界面清晰呈现。</p>
+        </div>
+
+        <div class="arch-step-item">
+          <div class="step-num">STEP 03</div>
+          <h4 class="step-title">审阅与点击发送</h4>
+          <p class="step-desc">用户在手机屏幕上审阅文字、可随意修改错别字或追加输入，点击“发送到 Mac”瞬时发出整句。</p>
+        </div>
+
+        <div class="arch-step-item">
+          <div class="step-num">STEP 04</div>
+          <h4 class="step-title">光标应用注入</h4>
+          <p class="step-desc">Mac 宿主收到纯字符串，调用 CGEvent 模拟键盘按键，将文字无缝敲入当前光标所在的应用程序中。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Download & Quick Start Section -->
+  <section class="install-section" id="download">
+    <div class="section-header">
+      <div class="section-tag">Get Started</div>
+      <h2 class="section-title">快速开始使用</h2>
+      <p class="section-desc">仅需两步配置，立即体验极速语音输入的畅快感。</p>
+    </div>
+
+    <div class="install-grid">
+      <!-- Mac Setup Card -->
+      <div class="install-card">
+        <div class="install-card-title">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+          第一步：Mac 宿主程序设置
+        </div>
+        <p style="color: var(--text-secondary); font-size: 0.95rem; margin-bottom: 1rem;">
+          宿主程序以菜单栏 Accessory 形式常驻运行。您可以直接构建 DMG 安装包或在本地编译运行：
+        </p>
+
+        <div class="terminal-box">
+          <div class="terminal-header">
+            <div class="term-dots">
+              <div class="term-dot dot-red"></div>
+              <div class="term-dot dot-yellow"></div>
+              <div class="term-dot dot-green"></div>
+            </div>
+            <button class="copy-btn" data-target="cmd-mac-build">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+              复制
+            </button>
+          </div>
+          <div class="terminal-body" id="cmd-mac-build">
+<span class="terminal-comment"># 构建专属 macOS DMG 安装包</span>
+./mac/build_macos.sh
+<span class="terminal-comment"># 或直接单文件编译并启动</span>
+swiftc -o VocalHost mac/VocalHostApp.swift -parse-as-library &amp;&amp; ./VocalHost</div>
+        </div>
+
+        <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.75rem;">
+          ⚠️ <strong>权限注意：</strong> 首次运行后，请前往 <code>系统设置 &gt; 隐私与安全性 &gt; 辅助功能</code> 勾选授权 <strong>VocalHost</strong>。
+        </p>
+      </div>
+
+      <!-- iOS Setup Card -->
+      <div class="install-card">
+        <div class="install-card-title">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+          第二步：iPhone 客户端运行
+        </div>
+        <p style="color: var(--text-secondary); font-size: 0.95rem; margin-bottom: 1rem;">
+          客户端基于 Flutter 构建。连接您的真机 iPhone 并在局域网内运行：
+        </p>
+
+        <div class="terminal-box">
+          <div class="terminal-header">
+            <div class="term-dots">
+              <div class="term-dot dot-red"></div>
+              <div class="term-dot dot-yellow"></div>
+              <div class="term-dot dot-green"></div>
+            </div>
+            <button class="copy-btn" data-target="cmd-ios-run">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+              复制
+            </button>
+          </div>
+          <div class="terminal-body" id="cmd-ios-run">
+<span class="terminal-comment"># 进入移动端工程目录</span>
+cd mobile
+<span class="terminal-comment"># iOS 26 真机请务必使用 profile 模式安装调试</span>
+fvm flutter run --profile</div>
+        </div>
+
+        <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.75rem;">
+          💡 <strong>网络要求：</strong> iPhone 与 Mac 须处于同一个 Wi-Fi 网络（路由器勿开启 AP 隔离）。
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ Section -->
+  <section class="faq-section" id="faq">
+    <div class="section-header">
+      <div class="section-tag">FAQ</div>
+      <h2 class="section-title">常见问题解答</h2>
+    </div>
+
+    <div class="faq-list">
+      <div class="faq-item active">
+        <div class="faq-question">
+          <span>为什么要用 iPhone 做 Mac 语音输入，而不是直接用 Mac 键盘听写？</span>
+          <span class="faq-icon">▼</span>
+        </div>
+        <div class="faq-answer">
+          iPhone 拥有专门针对人声调校的多麦克风立体降噪阵列，即使双手远离电脑、斜躺在人体工学椅上也能清晰拾音；且手机端提供了可直观审阅的屏幕和软键盘，方便快速修正个别生僻词错别字。
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-question">
+          <span>我的语音和转写的文字会被上传到任何第三方云服务器吗？</span>
+          <span class="faq-icon">▼</span>
+        </div>
+        <div class="faq-answer">
+          绝对不会。Vocal 完全开源透明，手机与 Mac 之间通过纯局域网（本地 Wi-Fi）点对点通信；语音识别完全依赖 Apple 原生系统框架（SFSpeechRecognizer），无任何外部云端中转服务器。
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-question">
+          <span>为什么采用“手动发送”而不是“边说边自动实时敲到电脑上”？</span>
+          <span class="faq-icon">▼</span>
+        </div>
+        <div class="faq-answer">
+          实时流式发送容易因为口误、自动纠错或者说话停顿产生反复删改、字符冲突和光标错位；手动发送模式让您完整说完一段话并确认无误后再一键发出，保证输出质量 100% 稳定可靠。
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-question">
+          <span>手机没有自动发现 Mac 电脑怎么办？</span>
+          <span class="faq-icon">▼</span>
+        </div>
+        <div class="faq-answer">
+          请检查两端是否连接到了同一个 Wi-Fi 网络（尤其是路由器是否分开了 2.4G/5G 或开启了“访客隔离/AP隔离”）；并确保 Mac 宿主程序已启动并在菜单栏正常显示麦克风图标。
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-container">
+      <div class="footer-brand">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <img src="images/logo.png" alt="Vocal" style="width: 24px; height: 24px; border-radius: 6px;">
+          <strong style="font-size: 1.1rem; letter-spacing: 1px;">VOCAL</strong>
+        </div>
+        <p class="footer-copy">MIT Licensed &bull; Copyright &copy; 2026 Vocal Contributors.</p>
+      </div>
+
+      <ul class="footer-links">
+        <li><a href="https://github.com/idcpj/vocal" target="_blank" class="footer-link">GitHub 仓库</a></li>
+        <li><a href="#features" class="footer-link">特性介绍</a></li>
+        <li><a href="#download" class="footer-link">安装说明</a></li>
+        <li><a href="#faq" class="footer-link">常见问题</a></li>
+      </ul>
+    </div>
+  </footer>
+
+  <!-- Toast Notification -->
+  <div class="toast" id="toast">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#22D3EE" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+    <span class="toast-msg">操作成功</span>
+  </div>
+
+  <script src="main.js"></script>
+</body>
+</html>

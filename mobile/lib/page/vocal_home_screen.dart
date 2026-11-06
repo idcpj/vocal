@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:vocal/page/device_selection_page.dart';
+import 'package:vocal/page/locale_selection_sheet.dart';
 import 'package:vocal/page/vocal_home_controller.dart';
 
 class VocalHomeScreen extends StatefulWidget {
@@ -13,11 +15,14 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
     with SingleTickerProviderStateMixin {
   late final VocalHomeController _ctrl;
   late final AnimationController _animController;
+  late final TextEditingController _textController;
+  final FocusNode _focusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
     _ctrl = VocalHomeController();
+    _textController = TextEditingController();
     _ctrl.addListener(_onControllerUpdate);
     _animController = AnimationController(
       vsync: this,
@@ -26,7 +31,15 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
   }
 
   void _onControllerUpdate() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    // Synchronize text from speech recognition to the TextField without breaking user cursor
+    if (_textController.text != _ctrl.textDraft) {
+      _textController.value = TextEditingValue(
+        text: _ctrl.textDraft,
+        selection: TextSelection.collapsed(offset: _ctrl.textDraft.length),
+      );
+    }
+    setState(() {});
   }
 
   @override
@@ -34,6 +47,8 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
     _ctrl.removeListener(_onControllerUpdate);
     _ctrl.dispose();
     _animController.dispose();
+    _textController.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -42,14 +57,34 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(),
-            _buildMicArea(),
-            if (_ctrl.historyList.isNotEmpty) _buildHistorySection(),
-            _buildTranscriptionBlock(),
-          ],
+        child: GestureDetector(
+          onTap: () => FocusScope.of(context).unfocus(),
+          child: Column(
+            children: [
+              _buildHeader(),
+              Expanded(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 12),
+                      _buildMicSection(),
+                      const SizedBox(height: 20),
+                      _buildEditorCard(),
+                      if (_ctrl.historyList.isNotEmpty) ...[
+                        const SizedBox(height: 20),
+                        _buildHistorySection(),
+                      ],
+                      const SizedBox(height: 32),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -59,19 +94,40 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
 
   Widget _buildHeader() {
     return Container(
-      height: 60,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      height: 56,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Text(
-            'VOCAL',
-            style: TextStyle(
-              color: Color(0xFF22D3EE),
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 2,
-            ),
+          Row(
+            children: [
+              const Text(
+                'VOCAL',
+                style: TextStyle(
+                  color: Color(0xFF22D3EE),
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 2,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF22D3EE).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text(
+                  'MANUAL',
+                  style: TextStyle(
+                    color: Color(0xFF22D3EE),
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ),
+            ],
           ),
           Row(
             children: [
@@ -88,16 +144,17 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
   }
 
   Widget _buildConnectionBadge() {
-    final color = _ctrl.isConnected ? Colors.green : Colors.red;
+    final color = _ctrl.isConnected ? const Color(0xFF22C55E) : const Color(0xFFEF4444);
     final label = _ctrl.isConnected ? 'ONLINE' : 'OFFLINE';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
           CircleAvatar(radius: 3, backgroundColor: color),
           const SizedBox(width: 6),
@@ -126,6 +183,7 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             const Icon(Icons.computer, color: badgeColor, size: 14),
             const SizedBox(width: 4),
@@ -152,34 +210,76 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
     );
   }
 
-  // ─── Mic Button Area ─────────────────────────────────────
+  // ─── Mic Button Section ──────────────────────────────────
 
-  Widget _buildMicArea() {
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+  Widget _buildMicSection() {
+    return Column(
+      children: [
+        Text(
+          _ctrl.statusText.toUpperCase(),
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.45),
+            fontSize: 11,
+            letterSpacing: 1.5,
+          ),
+        ),
+        const SizedBox(height: 16),
+        _buildMicButton(),
+        const SizedBox(height: 12),
+        Text(
+          _ctrl.isListening ? '正在录音中... 点击停止' : '点击麦克风说话',
+          style: TextStyle(
+            color: _ctrl.isListening
+                ? const Color(0xFF22D3EE)
+                : Colors.white.withValues(alpha: 0.6),
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            letterSpacing: 1,
+          ),
+        ),
+        const SizedBox(height: 10),
+        _buildLocaleSelector(),
+      ],
+    );
+  }
+
+  Widget _buildLocaleSelector() {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        LocaleSelectionSheet.show(context, _ctrl);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: const Color(0xFF22D3EE).withValues(alpha: 0.25),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
+            const Icon(
+              Icons.translate_rounded,
+              size: 13,
+              color: Color(0xFF22D3EE),
+            ),
+            const SizedBox(width: 6),
             Text(
-              _ctrl.statusText.toUpperCase(),
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.4),
+              _ctrl.currentLocaleDisplayName,
+              style: const TextStyle(
+                color: Colors.white,
                 fontSize: 12,
-                letterSpacing: 1.5,
+                fontWeight: FontWeight.w500,
               ),
             ),
-            const SizedBox(height: 48),
-            _buildMicButton(),
-            const SizedBox(height: 32),
-            Text(
-              _ctrl.isListening ? 'LISTENING...' : 'PUSH TO TALK',
-              style: const TextStyle(
-                color: Color(0xFF22D3EE),
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 2,
-              ),
+            const SizedBox(width: 4),
+            Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 15,
+              color: Colors.white.withValues(alpha: 0.5),
             ),
           ],
         ),
@@ -190,6 +290,7 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
   Widget _buildMicButton() {
     return GestureDetector(
       onTap: () {
+        HapticFeedback.selectionClick();
         if (_ctrl.isListening) {
           _ctrl.stopListening();
         } else {
@@ -199,31 +300,32 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
       child: AnimatedBuilder(
         animation: _animController,
         builder: (context, child) {
+          final isListening = _ctrl.isListening;
           return Container(
-            width: 120,
-            height: 120,
+            width: 88,
+            height: 88,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: const Color(0xFF22D3EE).withOpacity(0.05),
+              color: const Color(0xFF22D3EE).withValues(alpha: isListening ? 0.15 : 0.05),
               border: Border.all(
-                color: const Color(
-                  0xFF22D3EE,
-                ).withOpacity(0.3 + (_animController.value * 0.4)),
+                color: const Color(0xFF22D3EE).withValues(
+                  alpha: isListening ? 0.5 + (_animController.value * 0.5) : 0.25,
+                ),
                 width: 2,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(
-                    0xFF22D3EE,
-                  ).withOpacity(_ctrl.isListening ? 0.2 : 0.05),
-                  blurRadius: 20 + (_animController.value * 20),
-                  spreadRadius: 5,
+                  color: const Color(0xFF22D3EE).withValues(
+                    alpha: isListening ? 0.35 : 0.08,
+                  ),
+                  blurRadius: isListening ? 20 + (_animController.value * 20) : 10,
+                  spreadRadius: isListening ? 4 : 1,
                 ),
               ],
             ),
             child: Icon(
-              _ctrl.isListening ? Icons.mic : Icons.mic_none,
-              size: 48,
+              isListening ? Icons.mic : Icons.mic_none,
+              size: 40,
               color: const Color(0xFF22D3EE),
             ),
           );
@@ -232,117 +334,394 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
     );
   }
 
-  // ─── History Section ─────────────────────────────────────
+  // ─── Text Editor & Send Card ─────────────────────────────
 
-  Widget _buildHistorySection() {
+  Widget _buildEditorCard() {
+    final hasText = _textController.text.trim().isNotEmpty;
+    final canSend = _ctrl.isConnected && hasText;
+
     return Container(
-      height: 120,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: hasText
+              ? const Color(0xFF22D3EE).withValues(alpha: 0.25)
+              : Colors.white.withValues(alpha: 0.08),
+        ),
+        boxShadow: [
+          if (hasText)
+            BoxShadow(
+              color: const Color(0xFF22D3EE).withValues(alpha: 0.05),
+              blurRadius: 16,
+              spreadRadius: 2,
+            ),
+        ],
+      ),
+      padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'HISTORY',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.2),
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: ListView.builder(
-              padding: EdgeInsets.zero,
-              itemCount: _ctrl.historyList.length,
-              itemBuilder: (context, index) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Text(
-                    _ctrl.historyList[index],
+          // Card Header
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(
+                    Icons.edit_note_rounded,
+                    size: 16,
+                    color: Color(0xFF22D3EE),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '待发送文字',
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.5),
-                      fontSize: 13,
+                      color: Colors.white.withValues(alpha: 0.7),
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
                     ),
                   ),
-                );
-              },
+                ],
+              ),
+              if (hasText)
+                GestureDetector(
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    _ctrl.clearText();
+                    _textController.clear();
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.close_rounded,
+                          size: 12,
+                          color: Colors.white.withValues(alpha: 0.5),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '清空',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.5),
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Text Field
+          TextField(
+            controller: _textController,
+            focusNode: _focusNode,
+            maxLines: 5,
+            minLines: 3,
+            style: const TextStyle(
+              fontSize: 16,
+              height: 1.5,
+              color: Colors.white,
+              fontWeight: FontWeight.w400,
             ),
+            cursorColor: const Color(0xFF22D3EE),
+            onChanged: (val) {
+              _ctrl.updateText(val);
+            },
+            decoration: InputDecoration(
+              isDense: true,
+              contentPadding: EdgeInsets.zero,
+              border: InputBorder.none,
+              hintText: '点击上方麦克风开始录音，或在此处直接输入/修改文字...',
+              hintStyle: TextStyle(
+                color: Colors.white.withValues(alpha: 0.25),
+                fontSize: 14,
+                height: 1.5,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Divider(color: Color(0x1AFFFFFF), height: 1),
+          const SizedBox(height: 12),
+
+          // Bottom Send Toolbar
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // Character count & status hint
+              Row(
+                children: [
+                  Text(
+                    '${_textController.text.length} 字符',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.35),
+                      fontSize: 11,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  if (!_ctrl.isConnected)
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 3,
+                          backgroundColor: Colors.amber.withValues(alpha: 0.8),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Mac 未连接',
+                          style: TextStyle(
+                            color: Colors.amber.withValues(alpha: 0.8),
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+
+              // Right: Auto-Enter toggle & Send Button
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildAutoEnterToggle(),
+                  const SizedBox(width: 8),
+                  _buildSendButton(canSend),
+                ],
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  // ─── Transcription Block ─────────────────────────────────
-
-  Widget _buildTranscriptionBlock() {
-    return Container(
-      width: double.infinity,
-      constraints: const BoxConstraints(minHeight: 180),
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0F172A),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+  Widget _buildAutoEnterToggle() {
+    final enabled = _ctrl.autoPressEnter;
+    return Tooltip(
+      message: enabled ? '发送时自动触发 Mac 回车' : '发送时不触发回车',
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          _ctrl.toggleAutoPressEnter();
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: enabled
+                ? const Color(0xFF22D3EE).withValues(alpha: 0.15)
+                : Colors.white.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: enabled
+                  ? const Color(0xFF22D3EE).withValues(alpha: 0.6)
+                  : Colors.white.withValues(alpha: 0.12),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.notes, size: 14, color: Colors.white.withOpacity(0.3)),
-              const SizedBox(width: 8),
+              Icon(
+                Icons.keyboard_return_rounded,
+                size: 14,
+                color: enabled ? const Color(0xFF22D3EE) : Colors.white.withValues(alpha: 0.4),
+              ),
+              const SizedBox(width: 4),
               Text(
-                'LIVE TRANSCRIPTION',
+                '回车',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.3),
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1,
+                  color: enabled ? const Color(0xFF22D3EE) : Colors.white.withValues(alpha: 0.4),
+                  fontSize: 12,
+                  fontWeight: enabled ? FontWeight.bold : FontWeight.w500,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          _buildTranscriptionText(),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildTranscriptionText() {
-    final sent = _ctrl.lastSentWords;
-    final full = _ctrl.lastWords;
-
-    return RichText(
-      text: TextSpan(
-        style: const TextStyle(fontSize: 16, height: 1.5, fontFamily: 'Inter'),
-        children: [
-          if (sent.isNotEmpty && full.startsWith(sent)) ...[
-            TextSpan(
-              text: sent,
+  Widget _buildSendButton(bool canSend) {
+    return GestureDetector(
+      onTap: canSend
+          ? () {
+              HapticFeedback.mediumImpact();
+              final willPressEnter = _ctrl.autoPressEnter;
+              final success = _ctrl.sendCurrentDraft();
+              if (success) {
+                _textController.clear();
+                FocusScope.of(context).unfocus();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      willPressEnter ? '✅ 已发送到 Mac (已触发回车)' : '✅ 已发送到 Mac',
+                    ),
+                    duration: const Duration(seconds: 1),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+            }
+          : () {
+              if (!_ctrl.isConnected) {
+                HapticFeedback.selectionClick();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('⚠️ 请先连接局域网内的 Mac 主机'),
+                    duration: Duration(seconds: 2),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+            },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10),
+          gradient: canSend
+              ? const LinearGradient(
+                  colors: [Color(0xFF06B6D4), Color(0xFF3B82F6)],
+                )
+              : null,
+          color: canSend ? null : Colors.white.withValues(alpha: 0.08),
+          boxShadow: [
+            if (canSend)
+              BoxShadow(
+                color: const Color(0xFF06B6D4).withValues(alpha: 0.3),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.send_rounded,
+              size: 15,
+              color: canSend ? Colors.white : Colors.white.withValues(alpha: 0.25),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              '发送到 Mac',
               style: TextStyle(
-                color: Colors.greenAccent.withOpacity(0.8),
-                fontWeight: FontWeight.w500,
+                color: canSend ? Colors.white : Colors.white.withValues(alpha: 0.25),
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
               ),
             ),
-            TextSpan(
-              text: full.substring(sent.length),
-              style: TextStyle(color: Colors.white.withOpacity(0.9)),
-            ),
-          ] else ...[
-            TextSpan(
-              text: full,
-              style: TextStyle(color: Colors.white.withOpacity(0.9)),
-            ),
           ],
-          if (full.isEmpty)
-            TextSpan(
-              text: 'Transcription will appear here...',
-              style: TextStyle(color: Colors.white.withOpacity(0.2)),
-            ),
+        ),
+      ),
+    );
+  }
+
+  // ─── History Section ─────────────────────────────────────
+
+  Widget _buildHistorySection() {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A).withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '发送历史 (点击可重新填入)',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.4),
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              GestureDetector(
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  _ctrl.clearHistory();
+                },
+                child: Text(
+                  '清空记录',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.3),
+                    fontSize: 10,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _ctrl.historyList.length > 5 ? 5 : _ctrl.historyList.length,
+            separatorBuilder: (context, index) =>
+                const Divider(color: Color(0x0DFFFFFF), height: 12),
+            itemBuilder: (context, index) {
+              final itemText = _ctrl.historyList[index];
+              return InkWell(
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  _ctrl.setText(itemText);
+                  _textController.text = itemText;
+                  _textController.selection = TextSelection.collapsed(
+                    offset: itemText.length,
+                  );
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.history_rounded,
+                        size: 14,
+                        color: Colors.white.withValues(alpha: 0.3),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          itemText,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.7),
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Icon(
+                        Icons.north_west_rounded,
+                        size: 12,
+                        color: const Color(0xFF22D3EE).withValues(alpha: 0.5),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
         ],
       ),
     );

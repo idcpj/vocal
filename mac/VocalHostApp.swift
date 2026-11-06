@@ -30,12 +30,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
         // Ensure the app shows in the status bar even without a bundle
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         
-        if let button = statusItem?.button {
+        if statusItem?.button != nil {
             // Default to disconnected icon state
             updateIcon(connected: false)
         }
         
         updateMenu()
+        checkPermissions()
         startWebSocketServer()
         
         // Bring to front if needed, but since it's an accessory app, it stays in the menu bar
@@ -128,17 +129,37 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
     func receive(on connection: NWConnection) {
         connection.receiveMessage { [weak self] (data, context, isComplete, error) in
             guard let self = self else { return }
-            if let data = data, !data.isEmpty {
-                if let message = String(data: data, encoding: .utf8) {
-                    if message.contains("\"type\":\"pong\"") || message.contains("\"type\": \"pong\"") {
-                        print("Heartbeat pong received.")
-                    } else if !message.contains("\"type\":") {
-                        // message = full recognized string from mobile (one whole sentence sent at once)
-                        let fullText = message
-                        if !fullText.isEmpty {
-                            print("Injecting: \(fullText)")
-                            self.injectText(fullText)
+            if let data = data, !data.isEmpty, let message = String(data: data, encoding: .utf8) {
+                print("📩 Received message from mobile: \(message)")
+                fflush(stdout)
+                
+                if message.contains("\"type\":\"pong\"") || message.contains("\"type\": \"pong\"") {
+                    print("Heartbeat pong received.")
+                    fflush(stdout)
+                } else {
+                    // Try parsing as structured JSON first
+                    var didHandleJson = false
+                    if let jsonData = message.data(using: .utf8),
+                       let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+                       let type = json["type"] as? String, type == "text" {
+                        let text = json["text"] as? String ?? ""
+                        let pressEnter = json["pressEnter"] as? Bool ?? false
+                        if !text.isEmpty {
+                            print("Injecting text from JSON: \(text), pressEnter: \(pressEnter)")
+                            fflush(stdout)
+                            self.injectText(text)
+                            if pressEnter {
+                                self.pressReturnKey()
+                            }
                         }
+                        didHandleJson = true
+                    }
+                    
+                    // Fallback to plain text if not handled as JSON
+                    if !didHandleJson && !message.isEmpty {
+                        print("Injecting fallback plain text: \(message)")
+                        fflush(stdout)
+                        self.injectText(message)
                     }
                 }
             }
@@ -147,6 +168,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
                 self.receive(on: connection)
             } else {
                 print("Receive error or closure: \(String(describing: error))")
+                fflush(stdout)
                 DispatchQueue.main.async {
                     self.isConnected = false
                 }
@@ -155,7 +177,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
     }
     
     func injectText(_ text: String) {
+        if !AXIsProcessTrusted() {
+            print("⚠️ WARNING: Accessibility permission is NOT trusted! Text injection may fail.")
+            fflush(stdout)
+        }
         print("Injecting text: \(text)")
+        fflush(stdout)
         let source = CGEventSource(stateID: .combinedSessionState)
         
         for char in text.utf16 {
@@ -167,6 +194,23 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
             keyUp?.keyboardSetUnicodeString(stringLength: 1, unicodeString: [char])
             keyUp?.post(tap: .cgAnnotatedSessionEventTap)
         }
+    }
+
+    func pressReturnKey() {
+        print("Simulating Return key...")
+        let source = CGEventSource(stateID: .combinedSessionState)
+        let returnKeyCode: CGKeyCode = 0x24 // kVK_Return
+        
+        // Wait briefly for unicode text injection to settle in active app
+        usleep(30000) // 30ms
+        
+        let keyDown = CGEvent(keyboardEventSource: source, virtualKey: returnKeyCode, keyDown: true)
+        keyDown?.post(tap: .cgAnnotatedSessionEventTap)
+        
+        usleep(10000) // 10ms
+        
+        let keyUp = CGEvent(keyboardEventSource: source, virtualKey: returnKeyCode, keyDown: false)
+        keyUp?.post(tap: .cgAnnotatedSessionEventTap)
     }
     
     func startAdvertising() {
@@ -187,13 +231,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
     
     @objc func checkPermissions() {
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
-        let _ = AXIsProcessTrustedWithOptions(options as CFDictionary)
+        let trusted = AXIsProcessTrustedWithOptions(options as CFDictionary)
+        print("Accessibility permission trusted: \(trusted)")
+        fflush(stdout)
+        if !trusted {
+            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+                NSWorkspace.shared.open(url)
+            }
+        }
     }
 
     // MARK: - Heartbeat
     
     func startHeartbeat() {
-        DispatchQueue.main.async {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
             self.heartbeatTimer?.invalidate()
             self.heartbeatTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
                 self?.sendPing()

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
@@ -25,38 +26,135 @@ class VocalHomeController extends ChangeNotifier {
   List<nsd.Service> get discoveredServices =>
       List.unmodifiable(_discoveredServices);
 
-  // ─── Speech-to-Text ──────────────────────────────────────
+  // ─── Speech-to-Text & Locales ────────────────────────────
   final SpeechToText _speechToText = SpeechToText();
+  List<LocaleName> _availableLocales = [];
   String? _selectedLocaleId;
   String _lastWords = '';
   String _lastSentWords = '';
 
-  /// The last recognized sentence that was finalized and sent to Mac.
-  /// Used for deduplication within a single logic flow.
-  String _lastFinalizedText = '';
+  List<LocaleName> get availableLocales => List.unmodifiable(_availableLocales);
+  String? get selectedLocaleId => _selectedLocaleId;
 
-  /// Guard to prevent parallel finalizations (debounce vs finalResult).
-  bool _isFinalizing = false;
+  /// User-friendly label for current recognition locale
+  String get currentLocaleDisplayName {
+    if (_selectedLocaleId == null || _availableLocales.isEmpty) {
+      return '中文 (普通话)';
+    }
+    final match = _availableLocales.where((l) => l.localeId == _selectedLocaleId);
+    if (match.isNotEmpty) {
+      return match.first.name;
+    }
+    return _selectedLocaleId!;
+  }
+
+  /// Switch STT recognition locale dynamically in real-time
+  void setLocale(String localeId) {
+    if (_selectedLocaleId == localeId) return;
+    if (_speechToText.isListening) {
+      stopListening();
+    }
+    _selectedLocaleId = localeId;
+    debugPrint('Switched recognition locale to: $localeId');
+    notifyListeners();
+  }
+
+  @visibleForTesting
+  void setAvailableLocalesForTesting(List<LocaleName> locales, {String? defaultLocaleId}) {
+    _availableLocales = locales;
+    if (defaultLocaleId != null) {
+      _selectedLocaleId = defaultLocaleId;
+    } else if (locales.isNotEmpty) {
+      _selectedLocaleId = locales.first.localeId;
+    }
+    notifyListeners();
+  }
+
+  /// The current text in the draft/input box on mobile.
+  String _textDraft = '';
+
+  /// Base text accumulated before the current listening session started.
+  String _baseText = '';
 
   final List<String> _historyList = [];
   Timer? _debounceTimer;
-  bool _wantsListening = false; // Toggle state: user wants continuous listening
+  bool _wantsListening = false; // User wants continuous listening
   bool _isStartingSession = false; // Guard against parallel restarts
 
   bool get isListening => _speechToText.isListening;
   String get lastWords => _lastWords;
   String get lastSentWords => _lastSentWords;
+  String get textDraft => _textDraft;
   List<String> get historyList => List.unmodifiable(_historyList);
+
+  /// Whether to automatically simulate Enter/Return on Mac after sending text.
+  bool _autoPressEnter = false;
+  bool get autoPressEnter => _autoPressEnter;
+
+  /// Toggle the auto press Enter setting.
+  void toggleAutoPressEnter() {
+    _autoPressEnter = !_autoPressEnter;
+    debugPrint('Toggled autoPressEnter to: $_autoPressEnter');
+    notifyListeners();
+  }
+
+  /// Explicitly set the auto press Enter setting.
+  void setAutoPressEnter(bool value) {
+    if (_autoPressEnter != value) {
+      _autoPressEnter = value;
+      notifyListeners();
+    }
+  }
+
+  /// Update the current draft text (e.g. when typing or editing in TextField).
+  void updateText(String text) {
+    _textDraft = text;
+    _baseText = text;
+    notifyListeners();
+  }
+
+  /// Explicitly set the text (e.g. from history click).
+  void setText(String text) {
+    _textDraft = text;
+    _baseText = text;
+    notifyListeners();
+  }
+
+  /// Clear the current draft text and reset speech base.
+  void clearText() {
+    _textDraft = '';
+    _baseText = '';
+    _lastWords = '';
+    notifyListeners();
+  }
+
+  /// Clear history list.
+  void clearHistory() {
+    _historyList.clear();
+    notifyListeners();
+  }
+
+  bool _isDisposed = false;
 
   // ─── Lifecycle ───────────────────────────────────────────
 
-  VocalHomeController() {
-    _initSpeech();
-    discoverServices();
+  VocalHomeController({bool autoInit = true}) {
+    if (autoInit) {
+      _initSpeech();
+      discoverServices();
+    }
+  }
+
+  @override
+  void notifyListeners() {
+    if (!_isDisposed) {
+      super.notifyListeners();
+    }
   }
 
   @override
   void dispose() {
+    _isDisposed = true;
     _channel?.sink.close(status.goingAway);
     super.dispose();
   }
@@ -85,12 +183,32 @@ class VocalHomeController extends ChangeNotifier {
     );
     if (available) {
       final locales = await _speechToText.locales();
+      _availableLocales = locales;
+
+      // Smart default: prioritize Mandarin Chinese (zh_CN), fallback to any zh, or first locale
+      LocaleName? preferred;
       for (var locale in locales) {
-        if (locale.localeId.startsWith('zh')) {
-          _selectedLocaleId = locale.localeId;
-          debugPrint('Selected Chinese locale: ${locale.name}');
+        final id = locale.localeId.toLowerCase().replaceAll('-', '_');
+        if (id.contains('zh_cn') || id.contains('zh_hans')) {
+          preferred = locale;
           break;
         }
+      }
+      if (preferred == null) {
+        for (var locale in locales) {
+          if (locale.localeId.toLowerCase().startsWith('zh')) {
+            preferred = locale;
+            break;
+          }
+        }
+      }
+      if (preferred == null && locales.isNotEmpty) {
+        preferred = locales.first;
+      }
+
+      if (preferred != null) {
+        _selectedLocaleId = preferred.localeId;
+        debugPrint('STT Locale initialized to: ${preferred.name} (${preferred.localeId})');
       }
     }
     notifyListeners();
@@ -237,8 +355,8 @@ class VocalHomeController extends ChangeNotifier {
   // ─── Listening (STT) ────────────────────────────────────
 
   Future<void> startListening() async {
+    _baseText = _textDraft;
     _wantsListening = true;
-
     notifyListeners();
     await _beginListenSession();
   }
@@ -247,20 +365,15 @@ class VocalHomeController extends ChangeNotifier {
     _wantsListening = false;
     _debounceTimer?.cancel();
     await _speechToText.stop();
+    _baseText = _textDraft;
     _lastWords = '';
-    _lastSentWords = '';
     notifyListeners();
   }
 
   /// Internal: start a single STT listen session.
-  /// Uses dictation mode so the engine stays open and fires finalResult
-  /// for each completed sentence without stopping.
   Future<void> _beginListenSession() async {
     if (_isStartingSession) return;
     _isStartingSession = true;
-
-    // Clear session-level deduplication state
-    _lastFinalizedText = '';
 
     try {
       // Defensive delay for iOS 26 to ensure AVAudioSession is ready and stable
@@ -281,81 +394,96 @@ class VocalHomeController extends ChangeNotifier {
     }
   }
 
-  // ─── Speech Result Handling (Debounce) ─────────────────────
+  // ─── Speech Result Handling (Debounce & Draft Accumulation) ──
 
   void _onSpeechResult(SpeechRecognitionResult result) async {
     final newWords = result.recognizedWords;
-    final trimmed = newWords.trim();
-
-    // Ignore updates that match what we already finalized
-    if (trimmed == _lastFinalizedText && _lastFinalizedText.isNotEmpty) {
-      return;
-    }
-
     _lastWords = newWords;
+
+    // Combine base draft text with newly recognized speech
+    if (_baseText.trim().isEmpty) {
+      _textDraft = newWords;
+    } else {
+      final trimmedBase = _baseText.trimRight();
+      final lastChar =
+          trimmedBase.isNotEmpty ? trimmedBase.substring(trimmedBase.length - 1) : '';
+      final firstChar =
+          newWords.isNotEmpty ? newWords.substring(0, 1) : '';
+      final isBaseCjk = RegExp(r'[\u4e00-\u9fa5]').hasMatch(lastChar);
+      final isNewCjk = RegExp(r'[\u4e00-\u9fa5]').hasMatch(firstChar);
+
+      if (isBaseCjk && isNewCjk) {
+        _textDraft = '$trimmedBase$newWords';
+      } else {
+        _textDraft = '$trimmedBase $newWords';
+      }
+    }
     notifyListeners();
 
     // Reset debounce timer on every result
     _debounceTimer?.cancel();
-    if (trimmed.isNotEmpty) {
+    if (newWords.trim().isNotEmpty) {
       _debounceTimer = Timer(const Duration(milliseconds: 900), () {
-        debugPrint('Silence detected, auto-finalizing: "$newWords"');
-        _finalizeSentence(newWords);
+        debugPrint('Silence detected, finalizing local speech: "$newWords"');
+        _finalizeLocalSpeech();
       });
     }
 
-    // Official final result: handle immediately
+    // Official final result from engine: finalize speech into draft
     if (result.finalResult) {
       _debounceTimer?.cancel();
-      _finalizeSentence(newWords);
+      _finalizeLocalSpeech();
     }
   }
 
-  /// Finalize the current sentence: send to Mac, add to history, and restart listener.
-  void _finalizeSentence(String words) {
-    final trimmed = words.trim();
-    if (trimmed.isEmpty) return;
-
-    // Guard against parallel finalization (silence debounce vs official finalResult)
-    // or immediate duplicate strings.
-    if (_isFinalizing ||
-        (trimmed == _lastFinalizedText && _lastFinalizedText.isNotEmpty)) {
-      debugPrint('Ignoring duplicate/parallel finalization: "$trimmed"');
-      return;
-    }
-
-    _isFinalizing = true;
-    _lastFinalizedText = trimmed;
-
-    // Send to Mac and update history
-    _sendToMac(trimmed);
-    if (!_historyList.contains(trimmed)) {
-      _historyList.insert(0, trimmed);
-    }
-
-    // Clear local transient state
+  /// Finalize current spoken sentence into the draft without sending to Mac.
+  /// Allows user to review and edit before manually clicking Send.
+  void _finalizeLocalSpeech() {
+    _baseText = _textDraft;
     _lastWords = '';
-    _lastSentWords = '';
-
-    // Stop the engine. The onStatus listener will detect 'done' and restart
-    // because _wantsListening is still true.
+    _wantsListening = false;
     _speechToText.stop();
     notifyListeners();
-
-    // Reset the guard after a small "cooling" period to ensure the engine
-    // has actually stopped or transitioned state.
-    Future.delayed(const Duration(milliseconds: 300), () {
-      _isFinalizing = false;
-    });
   }
 
-  /// Send full recognized text to Mac. Mac handles delta calculation.
-  void _sendToMac(String fullText) {
-    if (_isConnected && _channel != null && fullText.isNotEmpty) {
-      _channel!.sink.add(fullText);
-      _lastSentWords = fullText;
-      notifyListeners();
-      debugPrint('Sent: "$fullText"');
+  // ─── Manual Send to Mac ──────────────────────────────────
+
+  /// Manually send the current draft text to the connected Mac host.
+  /// Returns true if successfully sent, false if empty or not connected.
+  bool sendCurrentDraft() {
+    final textToSend = _textDraft.trim();
+    if (textToSend.isEmpty) {
+      return false;
     }
+
+    if (!_isConnected || _channel == null) {
+      debugPrint('Cannot send: Mac is not connected.');
+      return false;
+    }
+
+    // Stop active listening if speech is in progress
+    if (_speechToText.isListening) {
+      stopListening();
+    }
+
+    final payload = jsonEncode({
+      'type': 'text',
+      'text': textToSend,
+      'pressEnter': _autoPressEnter,
+    });
+    _channel!.sink.add(payload);
+    debugPrint('Manually sent to Mac: "$textToSend" (pressEnter: $_autoPressEnter)');
+
+    _lastSentWords = textToSend;
+    if (!_historyList.contains(textToSend)) {
+      _historyList.insert(0, textToSend);
+    }
+
+    // Clear draft after successful transmission
+    _textDraft = '';
+    _baseText = '';
+    _lastWords = '';
+    notifyListeners();
+    return true;
   }
 }
