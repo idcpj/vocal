@@ -17,6 +17,7 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
   late final AnimationController _animController;
   late final TextEditingController _textController;
   final FocusNode _focusNode = FocusNode();
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -28,6 +29,20 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
       vsync: this,
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
+
+    _focusNode.addListener(() {
+      if (_focusNode.hasFocus) {
+        Future.delayed(const Duration(milliseconds: 200), () {
+          if (mounted && _scrollController.hasClients) {
+            _scrollController.animateTo(
+              0,
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOut,
+            );
+          }
+        });
+      }
+    });
   }
 
   void _onControllerUpdate() {
@@ -49,6 +64,7 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
     _animController.dispose();
     _textController.dispose();
     _focusNode.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -56,6 +72,9 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
 
   @override
   Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final isKeyboardOpen = bottomInset > 0;
+
     return Scaffold(
       resizeToAvoidBottomInset: true,
       body: SafeArea(
@@ -66,19 +85,31 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
               _buildHeader(),
               Expanded(
                 child: SingleChildScrollView(
+                  controller: _scrollController,
                   physics: const BouncingScrollPhysics(),
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Column(
                     children: [
-                      const SizedBox(height: 12),
-                      _buildMicSection(),
-                      const SizedBox(height: 20),
-                      _buildEditorCard(),
-                      if (_ctrl.historyList.isNotEmpty) ...[
+                      SizedBox(height: isKeyboardOpen ? 6 : 12),
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 250),
+                        child: isKeyboardOpen
+                            ? KeyedSubtree(
+                                key: const ValueKey('mini_mic'),
+                                child: _buildMiniMicBar(),
+                              )
+                            : KeyedSubtree(
+                                key: const ValueKey('full_mic'),
+                                child: _buildFullMicSection(),
+                              ),
+                      ),
+                      SizedBox(height: isKeyboardOpen ? 12 : 20),
+                      _buildEditorCard(isKeyboardOpen: isKeyboardOpen),
+                      if (!isKeyboardOpen && _ctrl.historyList.isNotEmpty) ...[
                         const SizedBox(height: 20),
                         _buildHistorySection(),
                       ],
-                      const SizedBox(height: 32),
+                      SizedBox(height: isKeyboardOpen ? 16 : 32),
                     ],
                   ),
                 ),
@@ -212,7 +243,7 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
 
   // ─── Mic Button Section ──────────────────────────────────
 
-  Widget _buildMicSection() {
+  Widget _buildFullMicSection() {
     return Column(
       children: [
         Text(
@@ -240,6 +271,74 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
         const SizedBox(height: 10),
         _buildLocaleSelector(),
       ],
+    );
+  }
+
+  Widget _buildMiniMicBar() {
+    final isListening = _ctrl.isListening;
+    return Container(
+      height: 42,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(21),
+        border: Border.all(
+          color: isListening
+              ? const Color(0xFF22D3EE).withValues(alpha: 0.5)
+              : Colors.white.withValues(alpha: 0.08),
+        ),
+        boxShadow: [
+          if (isListening)
+            BoxShadow(
+              color: const Color(0xFF22D3EE).withValues(alpha: 0.15),
+              blurRadius: 10,
+              spreadRadius: 1,
+            ),
+        ],
+      ),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () {
+              HapticFeedback.selectionClick();
+              if (isListening) {
+                _ctrl.stopListening();
+              } else {
+                _ctrl.startListening();
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF22D3EE).withValues(alpha: isListening ? 0.25 : 0.08),
+              ),
+              child: Icon(
+                isListening ? Icons.mic : Icons.mic_none,
+                size: 16,
+                color: const Color(0xFF22D3EE),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              isListening ? '正在录音中...' : _ctrl.statusText.toUpperCase(),
+              style: TextStyle(
+                color: isListening
+                    ? const Color(0xFF22D3EE)
+                    : Colors.white.withValues(alpha: 0.5),
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                letterSpacing: 0.5,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          _buildLocaleSelector(),
+        ],
+      ),
     );
   }
 
@@ -336,7 +435,7 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
 
   // ─── Text Editor & Send Card ─────────────────────────────
 
-  Widget _buildEditorCard() {
+  Widget _buildEditorCard({required bool isKeyboardOpen}) {
     final hasText = _textController.text.trim().isNotEmpty;
     final canSend = _ctrl.isConnected && hasText;
 
@@ -359,7 +458,7 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
             ),
         ],
       ),
-      padding: const EdgeInsets.all(18),
+      padding: EdgeInsets.all(isKeyboardOpen ? 14 : 18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -386,49 +485,92 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
                   ),
                 ],
               ),
-              if (hasText)
-                GestureDetector(
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    _ctrl.clearText();
-                    _textController.clear();
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.05),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.close_rounded,
-                          size: 12,
-                          color: Colors.white.withValues(alpha: 0.5),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (hasText)
+                    GestureDetector(
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        _ctrl.clearText();
+                        _textController.clear();
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(6),
                         ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '清空',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.5),
-                            fontSize: 11,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.close_rounded,
+                              size: 12,
+                              color: Colors.white.withValues(alpha: 0.5),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '清空',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.5),
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  if (isKeyboardOpen) ...[
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        FocusScope.of(context).unfocus();
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF22D3EE).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: const Color(0xFF22D3EE).withValues(alpha: 0.3),
                           ),
                         ),
-                      ],
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.keyboard_hide_rounded,
+                              size: 12,
+                              color: Color(0xFF22D3EE),
+                            ),
+                            SizedBox(width: 4),
+                            Text(
+                              '收起',
+                              style: TextStyle(
+                                color: Color(0xFF22D3EE),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
-                ),
+                  ],
+                ],
+              ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: isKeyboardOpen ? 8 : 12),
 
           // Text Field
           TextField(
             controller: _textController,
             focusNode: _focusNode,
-            maxLines: 5,
-            minLines: 3,
+            maxLines: isKeyboardOpen ? 4 : 5,
+            minLines: isKeyboardOpen ? 2 : 3,
             style: const TextStyle(
               fontSize: 16,
               height: 1.5,
@@ -451,9 +593,9 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: isKeyboardOpen ? 10 : 16),
           const Divider(color: Color(0x1AFFFFFF), height: 1),
-          const SizedBox(height: 12),
+          SizedBox(height: isKeyboardOpen ? 8 : 12),
 
           // Bottom Send Toolbar
           Row(
