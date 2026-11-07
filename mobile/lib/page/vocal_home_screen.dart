@@ -64,52 +64,36 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
     return Scaffold(
       resizeToAvoidBottomInset: true,
       body: SafeArea(
-        child: GestureDetector(
-          onTap: () => FocusScope.of(context).unfocus(),
-          child: Column(
-            children: [
-              _buildHeader(),
-              Expanded(
-                child: isKeyboardOpen
-                    ? Padding(
-                        padding: const EdgeInsets.fromLTRB(18, 4, 18, 8),
-                        child: _buildEditorCard(
-                          hasText: hasText,
-                          isKeyboardMode: true,
-                        ),
-                      )
-                    : LayoutBuilder(
-                        builder: (context, constraints) {
-                          return SingleChildScrollView(
-                            physics: const BouncingScrollPhysics(),
-                            padding: const EdgeInsets.symmetric(horizontal: 18),
-                            child: ConstrainedBox(
-                              constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                              child: IntrinsicHeight(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                                  children: [
-                                    const SizedBox(height: 8),
-                                    // 1. History Section at Top (Always visible with empty state)
-                                    _buildHistorySection(),
-                                    const SizedBox(height: 14),
-                                    // Spacer keeps the editor card docked at the bottom when content is short
-                                    const Spacer(),
-                                    // 2. Draft Editor Card at Bottom (Thumb Heat Zone)
-                                    _buildEditorCard(hasText: hasText),
-                                    const SizedBox(height: 14),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
+        child: Column(
+          children: [
+            _buildHeader(),
+            // 1. History Section at Top (Collapses smoothly when keyboard opens)
+            AnimatedCrossFade(
+              duration: const Duration(milliseconds: 200),
+              crossFadeState: isKeyboardOpen
+                  ? CrossFadeState.showSecond
+                  : CrossFadeState.showFirst,
+              firstChild: Padding(
+                padding: const EdgeInsets.fromLTRB(18, 4, 18, 10),
+                child: GestureDetector(
+                  onTap: () => FocusScope.of(context).unfocus(),
+                  behavior: HitTestBehavior.translucent,
+                  child: _buildHistorySection(),
+                ),
               ),
-              // 3. Dual-Action Bottom Bar (Voice + Send)
-              _buildBottomActionBar(canSend, isKeyboardOpen),
-            ],
-          ),
+              secondChild: const SizedBox(width: double.infinity, height: 0),
+            ),
+            // 2. Draft Editor Card at Bottom (Always single stable tree, zero rebuild flicker)
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                child: _buildEditorCard(hasText: hasText),
+              ),
+            ),
+            const SizedBox(height: 8),
+            // 3. Dual-Action Bottom Bar (Voice + Send / Dismiss Keyboard + Send)
+            _buildBottomActionBar(canSend, isKeyboardOpen),
+          ],
         ),
       ),
     );
@@ -238,107 +222,112 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
 
   // ─── Text Editor Card (with in-card options) ──────────────
 
-  Widget _buildEditorCard({required bool hasText, bool isKeyboardMode = false}) {
+  Widget _buildEditorCard({required bool hasText}) {
     final strings = AppStrings.current;
     final isListening = _ctrl.isListening;
 
-    return Container(
-      width: double.infinity,
-      height: isKeyboardMode ? double.infinity : null,
-      decoration: BoxDecoration(
-        color: const Color(0xFF0F172A),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: isListening
-              ? const Color(0xFF22D3EE)
-              : (hasText
-                  ? const Color(0xFF22D3EE).withValues(alpha: 0.35)
-                  : Colors.white.withValues(alpha: 0.08)),
-          width: isListening ? 1.5 : 1.0,
-        ),
-        boxShadow: [
-          if (isListening)
-            BoxShadow(
-              color: const Color(0xFF22D3EE).withValues(alpha: 0.18),
-              blurRadius: 18,
-              spreadRadius: 2,
-            )
-          else if (hasText)
-            BoxShadow(
-              color: const Color(0xFF22D3EE).withValues(alpha: 0.05),
-              blurRadius: 14,
-              spreadRadius: 1,
-            ),
-        ],
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Card Top Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.edit_note_rounded,
-                    size: 16,
-                    color: isListening ? const Color(0xFF22D3EE) : const Color(0xFF38BDF8),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    isListening ? strings.listeningStatus : strings.draftTitle,
-                    style: TextStyle(
-                      color: isListening
-                          ? const Color(0xFF22D3EE)
-                          : Colors.white.withValues(alpha: 0.75),
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ],
-              ),
-              if (hasText)
-                GestureDetector(
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    _ctrl.clearText();
-                    _textController.clear();
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.05),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.close_rounded,
-                          size: 12,
-                          color: Colors.white.withValues(alpha: 0.5),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          strings.clearDraft,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.5),
-                            fontSize: 11,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-            ],
+    return GestureDetector(
+      onTap: () {
+        if (!_focusNode.hasFocus) {
+          _focusNode.requestFocus();
+        }
+      },
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F172A),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: isListening
+                ? const Color(0xFF22D3EE)
+                : (hasText
+                    ? const Color(0xFF22D3EE).withValues(alpha: 0.35)
+                    : Colors.white.withValues(alpha: 0.08)),
+            width: isListening ? 1.5 : 1.0,
           ),
-          const SizedBox(height: 12),
+          boxShadow: [
+            if (isListening)
+              BoxShadow(
+                color: const Color(0xFF22D3EE).withValues(alpha: 0.18),
+                blurRadius: 18,
+                spreadRadius: 2,
+              )
+            else if (hasText)
+              BoxShadow(
+                color: const Color(0xFF22D3EE).withValues(alpha: 0.05),
+                blurRadius: 14,
+                spreadRadius: 1,
+              ),
+          ],
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Card Top Header
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.edit_note_rounded,
+                      size: 16,
+                      color: isListening ? const Color(0xFF22D3EE) : const Color(0xFF38BDF8),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      isListening ? strings.listeningStatus : strings.draftTitle,
+                      style: TextStyle(
+                        color: isListening
+                            ? const Color(0xFF22D3EE)
+                            : Colors.white.withValues(alpha: 0.75),
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+                if (hasText)
+                  GestureDetector(
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      _ctrl.clearText();
+                      _textController.clear();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.close_rounded,
+                            size: 12,
+                            color: Colors.white.withValues(alpha: 0.5),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            strings.clearDraft,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.5),
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
 
-          // Text Field (Thumb Zone Interactive Area)
-          if (isKeyboardMode)
+            // Text Field (Single stable node, vertically expands naturally)
             Expanded(
               child: TextField(
                 controller: _textController,
@@ -368,44 +357,17 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
                   ),
                 ),
               ),
-            )
-          else
-            TextField(
-              controller: _textController,
-              focusNode: _focusNode,
-              maxLines: 6,
-              minLines: 3,
-              style: const TextStyle(
-                fontSize: 15,
-                height: 1.5,
-                color: Colors.white,
-                fontWeight: FontWeight.w400,
-              ),
-              cursorColor: const Color(0xFF22D3EE),
-              onChanged: (val) {
-                _ctrl.updateText(val);
-              },
-              decoration: InputDecoration(
-                isDense: true,
-                contentPadding: EdgeInsets.zero,
-                border: InputBorder.none,
-                hintText: strings.editorHint,
-                hintStyle: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.25),
-                  fontSize: 14,
-                  height: 1.5,
-                ),
-              ),
             ),
-          const SizedBox(height: 12),
+            const SizedBox(height: 10),
 
-          // Divider
-          Divider(color: Colors.white.withValues(alpha: 0.06), height: 1),
-          const SizedBox(height: 10),
+            // Divider
+            Divider(color: Colors.white.withValues(alpha: 0.06), height: 1),
+            const SizedBox(height: 10),
 
-          // Card In-Line Metadata Bar (Language & Auto-Enter Switch)
-          _buildDraftMetaBar(),
-        ],
+            // Card In-Line Metadata Bar (Language & Auto-Enter Switch)
+            _buildDraftMetaBar(),
+          ],
+        ),
       ),
     );
   }
