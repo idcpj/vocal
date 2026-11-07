@@ -70,33 +70,41 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
             children: [
               _buildHeader(),
               Expanded(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    return SingleChildScrollView(
-                      physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.symmetric(horizontal: 18),
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                        child: IntrinsicHeight(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              const SizedBox(height: 8),
-                              // 1. History Section at Top (Always visible with empty state)
-                              _buildHistorySection(),
-                              const SizedBox(height: 14),
-                              // Spacer keeps the editor card docked at the bottom when content is short
-                              const Spacer(),
-                              // 2. Draft Editor Card at Bottom (Thumb Heat Zone)
-                              _buildEditorCard(hasText: hasText),
-                              const SizedBox(height: 14),
-                            ],
-                          ),
+                child: isKeyboardOpen
+                    ? Padding(
+                        padding: const EdgeInsets.fromLTRB(18, 4, 18, 8),
+                        child: _buildEditorCard(
+                          hasText: hasText,
+                          isKeyboardMode: true,
                         ),
+                      )
+                    : LayoutBuilder(
+                        builder: (context, constraints) {
+                          return SingleChildScrollView(
+                            physics: const BouncingScrollPhysics(),
+                            padding: const EdgeInsets.symmetric(horizontal: 18),
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                              child: IntrinsicHeight(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    const SizedBox(height: 8),
+                                    // 1. History Section at Top (Always visible with empty state)
+                                    _buildHistorySection(),
+                                    const SizedBox(height: 14),
+                                    // Spacer keeps the editor card docked at the bottom when content is short
+                                    const Spacer(),
+                                    // 2. Draft Editor Card at Bottom (Thumb Heat Zone)
+                                    _buildEditorCard(hasText: hasText),
+                                    const SizedBox(height: 14),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
                       ),
-                    );
-                  },
-                ),
               ),
               // 3. Dual-Action Bottom Bar (Voice + Send)
               _buildBottomActionBar(canSend, isKeyboardOpen),
@@ -230,12 +238,13 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
 
   // ─── Text Editor Card (with in-card options) ──────────────
 
-  Widget _buildEditorCard({required bool hasText}) {
+  Widget _buildEditorCard({required bool hasText, bool isKeyboardMode = false}) {
     final strings = AppStrings.current;
     final isListening = _ctrl.isListening;
 
     return Container(
       width: double.infinity,
+      height: isKeyboardMode ? double.infinity : null,
       decoration: BoxDecoration(
         color: const Color(0xFF0F172A),
         borderRadius: BorderRadius.circular(18),
@@ -329,33 +338,65 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
           const SizedBox(height: 12),
 
           // Text Field (Thumb Zone Interactive Area)
-          TextField(
-            controller: _textController,
-            focusNode: _focusNode,
-            maxLines: 6,
-            minLines: 3,
-            style: const TextStyle(
-              fontSize: 15,
-              height: 1.5,
-              color: Colors.white,
-              fontWeight: FontWeight.w400,
-            ),
-            cursorColor: const Color(0xFF22D3EE),
-            onChanged: (val) {
-              _ctrl.updateText(val);
-            },
-            decoration: InputDecoration(
-              isDense: true,
-              contentPadding: EdgeInsets.zero,
-              border: InputBorder.none,
-              hintText: strings.editorHint,
-              hintStyle: TextStyle(
-                color: Colors.white.withValues(alpha: 0.25),
-                fontSize: 14,
+          if (isKeyboardMode)
+            Expanded(
+              child: TextField(
+                controller: _textController,
+                focusNode: _focusNode,
+                maxLines: null,
+                expands: true,
+                textAlignVertical: TextAlignVertical.top,
+                style: const TextStyle(
+                  fontSize: 15,
+                  height: 1.5,
+                  color: Colors.white,
+                  fontWeight: FontWeight.w400,
+                ),
+                cursorColor: const Color(0xFF22D3EE),
+                onChanged: (val) {
+                  _ctrl.updateText(val);
+                },
+                decoration: InputDecoration(
+                  isDense: true,
+                  contentPadding: EdgeInsets.zero,
+                  border: InputBorder.none,
+                  hintText: strings.editorHint,
+                  hintStyle: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.25),
+                    fontSize: 14,
+                    height: 1.5,
+                  ),
+                ),
+              ),
+            )
+          else
+            TextField(
+              controller: _textController,
+              focusNode: _focusNode,
+              maxLines: 6,
+              minLines: 3,
+              style: const TextStyle(
+                fontSize: 15,
                 height: 1.5,
+                color: Colors.white,
+                fontWeight: FontWeight.w400,
+              ),
+              cursorColor: const Color(0xFF22D3EE),
+              onChanged: (val) {
+                _ctrl.updateText(val);
+              },
+              decoration: InputDecoration(
+                isDense: true,
+                contentPadding: EdgeInsets.zero,
+                border: InputBorder.none,
+                hintText: strings.editorHint,
+                hintStyle: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.25),
+                  fontSize: 14,
+                  height: 1.5,
+                ),
               ),
             ),
-          ),
           const SizedBox(height: 12),
 
           // Divider

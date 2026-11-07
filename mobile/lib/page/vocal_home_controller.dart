@@ -83,11 +83,10 @@ class VocalHomeController extends ChangeNotifier {
   bool _isSessionFinalized = false;
 
   final List<String> _historyList = [];
-  Timer? _debounceTimer;
-  bool _wantsListening = false; // User wants continuous listening
+  bool _wantsListening = false; // User wants continuous listening (manual stop only)
   bool _isStartingSession = false; // Guard against parallel restarts
 
-  bool get isListening => _speechToText.isListening;
+  bool get isListening => _wantsListening || _speechToText.isListening;
   String get lastWords => _lastWords;
   String get lastSentWords => _lastSentWords;
   String get textDraft => _textDraft;
@@ -372,6 +371,7 @@ class VocalHomeController extends ChangeNotifier {
     await _beginListenSession();
   }
 
+  /// Manually stop listening (manual stop only, no automatic cutoff)
   Future<void> stopListening() async {
     _wantsListening = false;
     _finalizeLocalSpeech();
@@ -384,7 +384,7 @@ class VocalHomeController extends ChangeNotifier {
 
     try {
       // Defensive delay for iOS 26 to ensure AVAudioSession is ready and stable
-      await Future.delayed(const Duration(milliseconds: 400));
+      await Future.delayed(const Duration(milliseconds: 300));
 
       if (!_wantsListening) return; // Checked again after delay
 
@@ -392,8 +392,9 @@ class VocalHomeController extends ChangeNotifier {
         onResult: _onSpeechResult,
         localeId: _selectedLocaleId,
         listenMode: ListenMode.dictation,
-        listenFor: const Duration(seconds: 60),
-        cancelOnError: true,
+        listenFor: const Duration(hours: 1), // Long duration: manual stop only
+        pauseFor: const Duration(seconds: 30), // Prevent aggressive auto-pause
+        cancelOnError: false,
       );
     } finally {
       _isStartingSession = false;
@@ -401,7 +402,7 @@ class VocalHomeController extends ChangeNotifier {
     }
   }
 
-  // ─── Speech Result Handling (Debounce & Draft Accumulation) ──
+  // ─── Speech Result Handling (Continuous Manual Stop) ────────
 
   void _onSpeechResult(SpeechRecognitionResult result) {
     if (_isSessionFinalized) {
@@ -417,19 +418,11 @@ class VocalHomeController extends ChangeNotifier {
     _textDraft = _combineBaseAndSpoken(_sessionBaseText, newWords);
     notifyListeners();
 
-    // Reset debounce timer on every result
-    _debounceTimer?.cancel();
-    if (newWords.trim().isNotEmpty) {
-      _debounceTimer = Timer(const Duration(milliseconds: 900), () {
-        debugPrint('Silence detected, finalizing local speech: "$newWords"');
-        _finalizeLocalSpeech();
-      });
-    }
-
-    // Official final result from engine: finalize speech into draft
-    if (result.finalResult) {
-      _debounceTimer?.cancel();
-      _finalizeLocalSpeech();
+    // When a single sentence completes (engine finalizes a phrase):
+    // Commit to base text so subsequent phrases accumulate, but DO NOT stop listening!
+    if (result.finalResult && _wantsListening) {
+      _sessionBaseText = _textDraft;
+      _currentSessionWords = '';
     }
   }
 
@@ -452,12 +445,10 @@ class VocalHomeController extends ChangeNotifier {
     }
   }
 
-  /// Finalize current spoken sentence into the draft without sending to Mac.
-  /// Allows user to review and edit before manually clicking Send.
+  /// Finalize current spoken sentence into the draft when user manually stops listening.
   void _finalizeLocalSpeech() {
     if (_isSessionFinalized) return;
     _isSessionFinalized = true;
-    _debounceTimer?.cancel();
 
     _textDraft = _combineBaseAndSpoken(_sessionBaseText, _currentSessionWords);
     _sessionBaseText = _textDraft;
