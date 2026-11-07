@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:vocal/i18n/app_strings.dart';
 import 'package:vocal/page/device_selection_page.dart';
 import 'package:vocal/page/locale_selection_sheet.dart';
 import 'package:vocal/page/vocal_home_controller.dart';
@@ -160,8 +161,9 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
   }
 
   Widget _buildConnectionBadge() {
+    final strings = AppStrings.current;
     final color = _ctrl.isConnected ? const Color(0xFF22C55E) : const Color(0xFFEF4444);
-    final label = _ctrl.isConnected ? 'ONLINE' : 'OFFLINE';
+    final label = _ctrl.isConnected ? strings.online : strings.offline;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -229,6 +231,7 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
   // ─── Text Editor Card (with in-card options) ──────────────
 
   Widget _buildEditorCard({required bool hasText}) {
+    final strings = AppStrings.current;
     final isListening = _ctrl.isListening;
 
     return Container(
@@ -276,7 +279,7 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    isListening ? '正在语音识别录入...' : '待发送文字',
+                    isListening ? strings.listeningStatus : strings.draftTitle,
                     style: TextStyle(
                       color: isListening
                           ? const Color(0xFF22D3EE)
@@ -311,7 +314,7 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          '清空',
+                          strings.clearDraft,
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.5),
                             fontSize: 11,
@@ -345,7 +348,7 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
               isDense: true,
               contentPadding: EdgeInsets.zero,
               border: InputBorder.none,
-              hintText: '点击下方语音按钮说话，或在此处直接编辑文字...',
+              hintText: strings.editorHint,
               hintStyle: TextStyle(
                 color: Colors.white.withValues(alpha: 0.25),
                 fontSize: 14,
@@ -367,6 +370,7 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
   }
 
   Widget _buildDraftMetaBar() {
+    final strings = AppStrings.current;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -378,7 +382,7 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              '${_textController.text.length} 字符',
+              strings.charCount(_textController.text.length),
               style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.35),
                 fontSize: 11,
@@ -437,6 +441,7 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
   }
 
   Widget _buildAutoEnterToggle() {
+    final strings = AppStrings.current;
     final enabled = _ctrl.autoPressEnter;
     return GestureDetector(
       onTap: () {
@@ -467,7 +472,7 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
             ),
             const SizedBox(width: 4),
             Text(
-              enabled ? '回车: 开' : '回车: 关',
+              enabled ? strings.autoEnterOn : strings.autoEnterOff,
               style: TextStyle(
                 color: enabled ? const Color(0xFF22D3EE) : Colors.white.withValues(alpha: 0.4),
                 fontSize: 11,
@@ -516,6 +521,7 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
   }
 
   Widget _buildVoiceInputButton() {
+    final strings = AppStrings.current;
     final isListening = _ctrl.isListening;
 
     return GestureDetector(
@@ -560,7 +566,7 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
             ),
             const SizedBox(width: 8),
             Text(
-              isListening ? '录音中 · 点击停止' : '轻触开始语音',
+              isListening ? strings.recordingStop : strings.tapToSpeak,
               style: TextStyle(
                 color: isListening ? const Color(0xFF0A0F1C) : const Color(0xFF22D3EE),
                 fontSize: 14,
@@ -574,6 +580,7 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
   }
 
   Widget _buildDismissKeyboardButton() {
+    final strings = AppStrings.current;
     return GestureDetector(
       onTap: () {
         HapticFeedback.selectionClick();
@@ -591,16 +598,16 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
-            Icon(
+          children: [
+            const Icon(
               Icons.keyboard_hide_rounded,
               size: 18,
               color: Color(0xFF22D3EE),
             ),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             Text(
-              '收起键盘',
-              style: TextStyle(
+              strings.dismissKeyboard,
+              style: const TextStyle(
                 color: Color(0xFF22D3EE),
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
@@ -613,6 +620,7 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
   }
 
   Widget _buildSendButton(bool canSend) {
+    final strings = AppStrings.current;
     return GestureDetector(
       onTap: canSend
           ? () {
@@ -624,7 +632,7 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
                 FocusScope.of(context).unfocus();
                 _showDarkToast(
                   context,
-                  willPressEnter ? '已发送 (已自动触发回车)' : '已发送',
+                  willPressEnter ? strings.sentWithEnter : strings.sent,
                   isSuccess: true,
                 );
               }
@@ -634,7 +642,7 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
                 HapticFeedback.selectionClick();
                 _showDarkToast(
                   context,
-                  '请先连接局域网内的 Mac 主机',
+                  strings.connectFirst,
                   isSuccess: false,
                 );
               }
@@ -669,7 +677,7 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
             ),
             const SizedBox(width: 6),
             Text(
-              '发送',
+              strings.send,
               style: TextStyle(
                 color: canSend ? Colors.white : Colors.white.withValues(alpha: 0.25),
                 fontSize: 14,
@@ -743,6 +751,7 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
   // ─── History Section ─────────────────────────────────────
 
   Widget _buildHistorySection() {
+    final strings = AppStrings.current;
     final hasHistory = _ctrl.historyList.isNotEmpty;
 
     return Container(
@@ -768,7 +777,7 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    '发送历史 (点击快捷填入)',
+                    strings.historyTitle,
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.4),
                       fontSize: 11,
@@ -785,7 +794,7 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
                     _ctrl.clearHistory();
                   },
                   child: Text(
-                    '清空记录',
+                    strings.clearHistory,
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.3),
                       fontSize: 10,
@@ -809,7 +818,7 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '暂无历史消息',
+                      strings.emptyHistoryTitle,
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.5),
                         fontSize: 13,
@@ -818,7 +827,7 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '发送成功后的文字将自动留存于此',
+                      strings.emptyHistorySub,
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.25),
                         fontSize: 11,

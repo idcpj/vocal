@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:speech_to_text/speech_to_text.dart';
+import 'package:vocal/i18n/app_strings.dart';
 import 'package:vocal/page/vocal_home_controller.dart';
 
 class LocaleSelectionSheet extends StatefulWidget {
@@ -29,15 +30,15 @@ class _LocaleSelectionSheetState extends State<LocaleSelectionSheet> {
 
   // Preset priority languages with flags
   static const List<Map<String, String>> _commonPresets = [
-    {'label': '普通话 (中国)', 'prefix': 'zh_cn', 'flag': '🇨🇳'},
-    {'label': '粤语 (香港)', 'prefix': 'zh_hk', 'flag': '🇭🇰'},
-    {'label': '英语 (美国)', 'prefix': 'en_us', 'flag': '🇺🇸'},
-    {'label': '英语 (英国)', 'prefix': 'en_gb', 'flag': '🇬🇧'},
-    {'label': '日语 (日本)', 'prefix': 'ja_jp', 'flag': '🇯🇵'},
-    {'label': '韩语 (韩国)', 'prefix': 'ko_kr', 'flag': '🇰🇷'},
-    {'label': '法语 (法国)', 'prefix': 'fr_fr', 'flag': '🇫🇷'},
-    {'label': '德语 (德国)', 'prefix': 'de_de', 'flag': '🇩🇪'},
-    {'label': '西班牙语', 'prefix': 'es_es', 'flag': '🇪🇸'},
+    {'zhLabel': '普通话 (中国)', 'enLabel': 'Mandarin (China)', 'prefix': 'zh_cn', 'flag': '🇨🇳'},
+    {'zhLabel': '粤语 (香港)', 'enLabel': 'Cantonese (HK)', 'prefix': 'zh_hk', 'flag': '🇭🇰'},
+    {'zhLabel': '英语 (美国)', 'enLabel': 'English (US)', 'prefix': 'en_us', 'flag': '🇺🇸'},
+    {'zhLabel': '英语 (英国)', 'enLabel': 'English (UK)', 'prefix': 'en_gb', 'flag': '🇬🇧'},
+    {'zhLabel': '日语 (日本)', 'enLabel': 'Japanese (Japan)', 'prefix': 'ja_jp', 'flag': '🇯🇵'},
+    {'zhLabel': '韩语 (韩国)', 'enLabel': 'Korean (Korea)', 'prefix': 'ko_kr', 'flag': '🇰🇷'},
+    {'zhLabel': '法语 (法国)', 'enLabel': 'French (France)', 'prefix': 'fr_fr', 'flag': '🇫🇷'},
+    {'zhLabel': '德语 (德国)', 'enLabel': 'German (Germany)', 'prefix': 'de_de', 'flag': '🇩🇪'},
+    {'zhLabel': '西班牙语', 'enLabel': 'Spanish (Spain)', 'prefix': 'es_es', 'flag': '🇪🇸'},
   ];
 
   @override
@@ -65,6 +66,7 @@ class _LocaleSelectionSheetState extends State<LocaleSelectionSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppStrings.current;
     final allLocales = _ctrl.availableLocales;
     final filteredLocales = allLocales.where((l) {
       if (_filterQuery.isEmpty) return true;
@@ -107,9 +109,9 @@ class _LocaleSelectionSheetState extends State<LocaleSelectionSheet> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        '选择识别语言',
-                        style: TextStyle(
+                      Text(
+                        strings.selectSpeechLanguage,
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -117,7 +119,7 @@ class _LocaleSelectionSheetState extends State<LocaleSelectionSheet> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '支持 ${allLocales.length} 种系统识别语言',
+                        strings.supportedLanguagesCount(allLocales.length),
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.4),
                           fontSize: 12,
@@ -168,7 +170,7 @@ class _LocaleSelectionSheetState extends State<LocaleSelectionSheet> {
                           });
                         },
                         decoration: InputDecoration(
-                          hintText: '搜索语言或代码 (如 中文, en, ja)...',
+                          hintText: strings.searchLanguageHint,
                           hintStyle: TextStyle(
                             color: Colors.white.withValues(alpha: 0.25),
                             fontSize: 13,
@@ -212,6 +214,7 @@ class _LocaleSelectionSheetState extends State<LocaleSelectionSheet> {
                   final matchingLocale = _findLocaleByPrefix(allLocales, preset['prefix']!);
                   final isCurrentSelected = matchingLocale != null &&
                       matchingLocale.localeId == _ctrl.selectedLocaleId;
+                  final label = strings.isChinese ? preset['zhLabel']! : preset['enLabel']!;
 
                   return GestureDetector(
                     onTap: () {
@@ -240,7 +243,7 @@ class _LocaleSelectionSheetState extends State<LocaleSelectionSheet> {
                           Text(preset['flag']!, style: const TextStyle(fontSize: 12)),
                           const SizedBox(width: 4),
                           Text(
-                            preset['label']!,
+                            label,
                             style: TextStyle(
                               color: isCurrentSelected
                                   ? const Color(0xFF22D3EE)

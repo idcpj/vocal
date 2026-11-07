@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:nsd/nsd.dart' as nsd;
+import 'package:vocal/i18n/app_strings.dart';
 import 'vocal_home_controller.dart';
 
 class DeviceSelectionPage extends StatefulWidget {
@@ -32,6 +33,7 @@ class _DeviceSelectionPageState extends State<DeviceSelectionPage> {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppStrings.current;
     return Scaffold(
       body: SafeArea(
         child: Padding(
@@ -42,9 +44,9 @@ class _DeviceSelectionPageState extends State<DeviceSelectionPage> {
               const SizedBox(height: 32),
               _buildWifiIcon(),
               const SizedBox(height: 24),
-              const Text(
-                '发现以下设备',
-                style: TextStyle(
+              Text(
+                strings.discoveredDevices,
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
@@ -52,7 +54,7 @@ class _DeviceSelectionPageState extends State<DeviceSelectionPage> {
               ),
               const SizedBox(height: 8),
               Text(
-                '选择要连接的 Mac',
+                strings.chooseMac,
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.4),
                   fontSize: 14,
@@ -72,6 +74,7 @@ class _DeviceSelectionPageState extends State<DeviceSelectionPage> {
   }
 
   Widget _buildHeader() {
+    final strings = AppStrings.current;
     return SizedBox(
       height: 60,
       child: Row(
@@ -79,13 +82,13 @@ class _DeviceSelectionPageState extends State<DeviceSelectionPage> {
         children: [
           GestureDetector(
             onTap: () => Navigator.pop(context),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.chevron_left, color: Color(0xFF22D3EE), size: 24),
-                SizedBox(width: 4),
+                const Icon(Icons.chevron_left, color: Color(0xFF22D3EE), size: 24),
+                const SizedBox(width: 4),
                 Text(
-                  '返回',
-                  style: TextStyle(
+                  strings.back,
+                  style: const TextStyle(
                     color: Color(0xFF22D3EE),
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
@@ -94,9 +97,9 @@ class _DeviceSelectionPageState extends State<DeviceSelectionPage> {
               ],
             ),
           ),
-          const Text(
-            '选择设备',
-            style: TextStyle(
+          Text(
+            strings.selectDevice,
+            style: const TextStyle(
               color: Colors.white,
               fontSize: 18,
               fontWeight: FontWeight.w600,
@@ -121,11 +124,12 @@ class _DeviceSelectionPageState extends State<DeviceSelectionPage> {
   }
 
   Widget _buildDeviceList() {
+    final strings = AppStrings.current;
     final services = _ctrl.discoveredServices;
     if (services.isEmpty) {
       return Center(
         child: Text(
-          '正在搜索设备...',
+          strings.searchingDevices,
           style: TextStyle(
             color: Colors.white.withValues(alpha: 0.4),
             fontSize: 16,
@@ -144,7 +148,8 @@ class _DeviceSelectionPageState extends State<DeviceSelectionPage> {
   }
 
   Widget _buildDeviceCard(nsd.Service service) {
-    final name = service.name ?? 'Unknown Device';
+    final strings = AppStrings.current;
+    final name = service.name ?? strings.unknownDevice;
     final address = '${service.host ?? '?'}:${service.port ?? '?'}';
 
     // Pick icon based on name
@@ -206,6 +211,7 @@ class _DeviceSelectionPageState extends State<DeviceSelectionPage> {
   }
 
   Widget _buildScanStatus() {
+    final strings = AppStrings.current;
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -219,7 +225,7 @@ class _DeviceSelectionPageState extends State<DeviceSelectionPage> {
         ),
         const SizedBox(width: 8),
         Text(
-          '正在扫描...',
+          strings.scanning,
           style: TextStyle(
             color: Colors.white.withValues(alpha: 0.4),
             fontSize: 13,
@@ -230,6 +236,7 @@ class _DeviceSelectionPageState extends State<DeviceSelectionPage> {
   }
 
   Widget _buildCancelButton() {
+    final strings = AppStrings.current;
     return GestureDetector(
       onTap: () => Navigator.pop(context),
       child: Container(
@@ -241,9 +248,9 @@ class _DeviceSelectionPageState extends State<DeviceSelectionPage> {
           border: Border.all(color: const Color(0xFF475569)),
         ),
         alignment: Alignment.center,
-        child: const Text(
-          '取消',
-          style: TextStyle(
+        child: Text(
+          strings.cancel,
+          style: const TextStyle(
             color: Color(0xFF94A3B8),
             fontSize: 16,
             fontWeight: FontWeight.w500,

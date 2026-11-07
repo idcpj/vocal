@@ -1,23 +1,39 @@
 import Cocoa
 import Network
 
+/// Lightweight i18n helper for Mac Host
+struct MacI18n {
+    static var isChinese: Bool {
+        let lang = Locale.preferredLanguages.first?.lowercased() ?? Locale.current.identifier.lowercased()
+        return lang.starts(with: "zh")
+    }
+    
+    static var starting: String { isChinese ? "正在启动..." : "Starting..." }
+    static var connected: String { isChinese ? "✅ 已连接" : "✅ Connected" }
+    static var waitingConnection: String { isChinese ? "⏳ 等待连接..." : "⏳ Waiting for connection..." }
+    static var advertising: String { isChinese ? "📡 广播中..." : "📡 Advertising..." }
+    static var checkPermissions: String { isChinese ? "检查辅助功能权限" : "Check Permissions" }
+    static var quitVocal: String { isChinese ? "退出 Vocal" : "Quit Vocal" }
+    static var accessibilityDescription: String { isChinese ? "Vocal 语音输入宿主" : "Vocal Host" }
+}
+
 class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
     var statusItem: NSStatusItem?
     var netService: NetService?
     var listener: NWListener?
     var connectedConnection: NWConnection?
     var heartbeatTimer: Timer?
-    var menuStatusText: String = "Starting..." {
+    var menuStatusText: String = MacI18n.starting {
         didSet { updateMenu() }
     }
     var isConnected: Bool = false {
         didSet {
             if isConnected {
-                menuStatusText = "✅ Connected"
+                menuStatusText = MacI18n.connected
                 updateIcon(connected: true)
                 startHeartbeat()
             } else {
-                menuStatusText = "⏳ Waiting for connection..."
+                menuStatusText = MacI18n.waitingConnection
                 updateIcon(connected: false)
                 stopHeartbeat()
             }
@@ -48,7 +64,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
             let config = NSImage.SymbolConfiguration(pointSize: 15, weight: .regular)
             let colorConfig = NSImage.SymbolConfiguration(hierarchicalColor: connected ? NSColor.systemGreen : NSColor.labelColor)
             let combined = config.applying(colorConfig)
-            button.image = NSImage(systemSymbolName: connected ? "mic.fill" : "mic", accessibilityDescription: "Vocal Host")?.withSymbolConfiguration(combined)
+            button.image = NSImage(systemSymbolName: connected ? "mic.fill" : "mic", accessibilityDescription: MacI18n.accessibilityDescription)?.withSymbolConfiguration(combined)
         }
     }
     
@@ -61,12 +77,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
         
         menu.addItem(NSMenuItem.separator())
         
-        let permissionItem = NSMenuItem(title: "Check Permissions", action: #selector(checkPermissions), keyEquivalent: "p")
+        let permissionItem = NSMenuItem(title: MacI18n.checkPermissions, action: #selector(checkPermissions), keyEquivalent: "p")
         menu.addItem(permissionItem)
         
         menu.addItem(NSMenuItem.separator())
         
-        let quitItem = NSMenuItem(title: "Quit Vocal", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        let quitItem = NSMenuItem(title: MacI18n.quitVocal, action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         menu.addItem(quitItem)
         
         statusItem?.menu = menu
@@ -83,7 +99,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
                 switch state {
                 case .ready:
                     print("WebSocket Server ready on port 8888")
-                    self.menuStatusText = "📡 Advertising..."
+                    self.menuStatusText = MacI18n.advertising
                     self.startAdvertising()
                 case .failed(let error):
                     print("Server failed: \(error)")

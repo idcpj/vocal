@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vocal/i18n/app_strings.dart';
 import 'package:vocal/page/vocal_home_screen.dart';
 
 void main() {
@@ -11,14 +12,19 @@ class VocalApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Vocal',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF0A0F1C),
-      ),
-      home: const VocalHomeScreen(),
+    return ValueListenableBuilder<AppStrings>(
+      valueListenable: AppStrings.notifier,
+      builder: (context, strings, child) {
+        return MaterialApp(
+          title: 'Vocal',
+          debugShowCheckedModeBanner: false,
+          theme: ThemeData(
+            brightness: Brightness.dark,
+            scaffoldBackgroundColor: const Color(0xFF0A0F1C),
+          ),
+          home: VocalHomeScreen(key: ValueKey(strings.languageCode)),
+        );
+      },
     );
   }
 }
