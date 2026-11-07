@@ -12,6 +12,7 @@ void main() {
     expect(find.text('发送'), findsOneWidget);
     expect(find.textContaining('回车'), findsOneWidget);
     expect(find.text('轻触开始语音'), findsOneWidget);
+    expect(find.text('暂无历史消息'), findsOneWidget);
 
     // Verify language selector is rendered
     expect(find.text('中文 (普通话)'), findsOneWidget);

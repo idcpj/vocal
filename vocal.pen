@@ -6,7 +6,633 @@
       "id": "iphone_normal",
       "x": 0,
       "y": 0,
-      "name": "iPhone Client (常规态 - 属性内聚草稿框 & 底部纯粹双动作)",
+      "name": "iPhone Client (初始默认态 - 暂无历史消息·输入框沉底)",
+      "clip": true,
+      "width": 393,
+      "height": 852,
+      "fill": "#0A0F1C",
+      "layout": "vertical",
+      "children": [
+        {
+          "type": "frame",
+          "id": "id_header_n",
+          "name": "header",
+          "width": "fill_container",
+          "height": 54,
+          "padding": [
+            0,
+            18
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "id_logo_grp",
+              "name": "logo_group",
+              "gap": 8,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "id_logo_t",
+                  "name": "logo",
+                  "fill": "#22D3EE",
+                  "content": "VOCAL",
+                  "fontFamily": "Inter",
+                  "fontSize": 18,
+                  "fontWeight": "700",
+                  "letterSpacing": 2
+                },
+                {
+                  "type": "frame",
+                  "id": "id_badge_m",
+                  "name": "mode_badge",
+                  "fill": "#22D3EE26",
+                  "cornerRadius": 4,
+                  "padding": [
+                    2,
+                    6
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "id_badge_mt",
+                      "name": "mode_txt",
+                      "fill": "#22D3EE",
+                      "content": "REMOTE MIC",
+                      "fontFamily": "Inter",
+                      "fontSize": 9,
+                      "fontWeight": "700",
+                      "letterSpacing": 1
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "id_stat_grp",
+              "name": "status_group",
+              "gap": 8,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "id_onl_badge",
+                  "name": "online_badge",
+                  "fill": "#22C55E26",
+                  "cornerRadius": 12,
+                  "stroke": {
+                    "thickness": 1,
+                    "fill": "#22C55E40"
+                  },
+                  "gap": 6,
+                  "padding": [
+                    4,
+                    10
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "ellipse",
+                      "id": "id_onl_dot",
+                      "name": "dot",
+                      "fill": "#22C55E",
+                      "width": 6,
+                      "height": 6
+                    },
+                    {
+                      "type": "text",
+                      "id": "id_onl_txt",
+                      "name": "txt",
+                      "fill": "#22C55E",
+                      "content": "ONLINE",
+                      "fontFamily": "Inter",
+                      "fontSize": 10,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "id_dev_badge",
+                  "name": "device_badge",
+                  "fill": "#EAB30826",
+                  "cornerRadius": 12,
+                  "stroke": {
+                    "thickness": 1,
+                    "fill": "#EAB30840"
+                  },
+                  "gap": 4,
+                  "padding": [
+                    4,
+                    10
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon_font",
+                      "id": "id_dev_ico",
+                      "name": "dev_icon",
+                      "width": 13,
+                      "height": 13,
+                      "iconFontName": "monitor",
+                      "iconFontFamily": "lucide",
+                      "fill": "#EAB308"
+                    },
+                    {
+                      "type": "text",
+                      "id": "id_dev_txt",
+                      "name": "dev_num",
+                      "fill": "#EAB308",
+                      "content": "1",
+                      "fontFamily": "Inter",
+                      "fontSize": 10,
+                      "fontWeight": "700"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "id_toast_bar",
+          "name": "dark_toast_preview",
+          "width": "fill_container",
+          "height": 28,
+          "justifyContent": "center",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "id_toast_pill",
+              "name": "toast_pill",
+              "fill": "#0F172AE6",
+              "cornerRadius": 14,
+              "stroke": {
+                "thickness": 1,
+                "fill": "#22C55E66"
+              },
+              "padding": [
+                3,
+                12
+              ],
+              "gap": 6,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon_font",
+                  "id": "id_t_chk",
+                  "name": "check_ico",
+                  "width": 12,
+                  "height": 12,
+                  "iconFontName": "check-circle-2",
+                  "iconFontFamily": "lucide",
+                  "fill": "#22C55E"
+                },
+                {
+                  "type": "text",
+                  "id": "id_t_txt",
+                  "name": "toast_txt",
+                  "fill": "#E2E8F0",
+                  "content": "已发送 (已自动触发回车)",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "600"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "id_main_body",
+          "name": "main_body",
+          "width": "fill_container",
+          "height": "fill_container",
+          "layout": "vertical",
+          "gap": 12,
+          "padding": [
+            4,
+            16
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "id_history_card_top",
+              "name": "history_section",
+              "width": "fill_container",
+              "height": 220,
+              "fill": "#0F172A80",
+              "cornerRadius": 16,
+              "stroke": {
+                "thickness": 1,
+                "fill": "#FFFFFF0F"
+              },
+              "layout": "vertical",
+              "gap": 8,
+              "padding": 12,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "id_h_top_bar_empty",
+                  "name": "h_top_bar",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "id_h_lbl_empty",
+                      "name": "h_lbl_grp",
+                      "gap": 6,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon_font",
+                          "id": "id_h_ico_empty",
+                          "name": "h_icon",
+                          "width": 13,
+                          "height": 13,
+                          "iconFontName": "history",
+                          "iconFontFamily": "lucide",
+                          "fill": "#64748B"
+                        },
+                        {
+                          "type": "text",
+                          "id": "id_h_title_empty",
+                          "name": "h_title",
+                          "fill": "#64748B",
+                          "content": "HISTORY · 历史记录",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "700",
+                          "letterSpacing": 1
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "id_h_empty_box",
+                  "name": "empty_state_box",
+                  "width": "fill_container",
+                  "height": "fill_container",
+                  "layout": "vertical",
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "gap": 8,
+                  "children": [
+                    {
+                      "type": "icon_font",
+                      "id": "id_empty_ico",
+                      "name": "empty_icon",
+                      "width": 26,
+                      "height": 26,
+                      "iconFontName": "message-square-dashed",
+                      "iconFontFamily": "lucide",
+                      "fill": "#475569"
+                    },
+                    {
+                      "type": "text",
+                      "id": "id_empty_txt",
+                      "name": "empty_title",
+                      "fill": "#64748B",
+                      "content": "暂无历史消息",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "id_empty_sub",
+                      "name": "empty_sub",
+                      "fill": "#475569",
+                      "content": "发送成功后的文字将自动留存于此",
+                      "fontFamily": "Inter",
+                      "fontSize": 11
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "id_editor_card_bottom",
+              "name": "editor_section",
+              "width": "fill_container",
+              "height": 260,
+              "fill": "#0F172A",
+              "cornerRadius": 18,
+              "stroke": {
+                "thickness": 1.5,
+                "fill": "#22D3EE66"
+              },
+              "layout": "vertical",
+              "justifyContent": "space_between",
+              "padding": 16,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "id_ed_top_bar",
+                  "name": "ed_top_bar",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "id_ed_title_grp",
+                      "name": "title_grp",
+                      "gap": 6,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon_font",
+                          "id": "id_ed_ico",
+                          "name": "edit_icon",
+                          "width": 14,
+                          "height": 14,
+                          "iconFontName": "edit-3",
+                          "iconFontFamily": "lucide",
+                          "fill": "#22D3EE"
+                        },
+                        {
+                          "type": "text",
+                          "id": "id_ed_title",
+                          "name": "card_title",
+                          "fill": "#22D3EE",
+                          "content": "待发送文字 (CURRENT DRAFT)",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "700"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "id_ed_clear_btn",
+                      "name": "clear_btn",
+                      "fill": "#FFFFFF0D",
+                      "cornerRadius": 6,
+                      "padding": [
+                        4,
+                        8
+                      ],
+                      "gap": 4,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon_font",
+                          "id": "id_clr_ico",
+                          "name": "x_ico",
+                          "width": 11,
+                          "height": 11,
+                          "iconFontName": "x",
+                          "iconFontFamily": "lucide",
+                          "fill": "#64748B"
+                        },
+                        {
+                          "type": "text",
+                          "id": "id_clr_txt",
+                          "name": "clr_lbl",
+                          "fill": "#64748B",
+                          "content": "清空",
+                          "fontFamily": "Inter",
+                          "fontSize": 11
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "id_draft_text",
+                  "name": "editor_content",
+                  "fill": "#FFFFFF",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "输入框默认吸附在屏幕下半部（单手拇指热区），即使没有历史记录也不会跑到顶部！上方常驻展示优雅的“暂无历史消息”空态卡片。|",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "400"
+                },
+                {
+                  "type": "frame",
+                  "id": "id_draft_meta_bar",
+                  "name": "draft_meta_bar",
+                  "width": "fill_container",
+                  "height": 34,
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "id_meta_lang",
+                      "name": "lang_pill",
+                      "fill": "#FFFFFF0A",
+                      "cornerRadius": 8,
+                      "stroke": {
+                        "thickness": 1,
+                        "fill": "#FFFFFF1A"
+                      },
+                      "padding": [
+                        4,
+                        8
+                      ],
+                      "gap": 4,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon_font",
+                          "id": "id_ml_ico",
+                          "name": "lang_ico",
+                          "width": 12,
+                          "height": 12,
+                          "iconFontName": "languages",
+                          "iconFontFamily": "lucide",
+                          "fill": "#22D3EE"
+                        },
+                        {
+                          "type": "text",
+                          "id": "id_ml_txt",
+                          "name": "lang_str",
+                          "fill": "#CBD5E1",
+                          "content": "中文 ▾",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "id_meta_right",
+                      "name": "meta_right_grp",
+                      "gap": 8,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "id_meta_char_cnt",
+                          "name": "char_cnt",
+                          "fill": "#64748B",
+                          "content": "68 字符",
+                          "fontFamily": "Inter",
+                          "fontSize": 11
+                        },
+                        {
+                          "type": "frame",
+                          "id": "id_meta_enter_toggle",
+                          "name": "auto_enter_switch",
+                          "fill": "#22D3EE1F",
+                          "cornerRadius": 8,
+                          "stroke": {
+                            "thickness": 1,
+                            "fill": "#22D3EE80"
+                          },
+                          "padding": [
+                            4,
+                            8
+                          ],
+                          "gap": 4,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon_font",
+                              "id": "id_me_ico",
+                              "name": "ret_ico",
+                              "width": 12,
+                              "height": 12,
+                              "iconFontName": "corner-down-left",
+                              "iconFontFamily": "lucide",
+                              "fill": "#22D3EE"
+                            },
+                            {
+                              "type": "text",
+                              "id": "id_me_txt",
+                              "name": "ret_str",
+                              "fill": "#22D3EE",
+                              "content": "自动回车: 开",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "justifyContent": "space_between"
+        },
+        {
+          "type": "frame",
+          "id": "id_bottom_dual_bar",
+          "name": "bottom_action_bar",
+          "width": "fill_container",
+          "height": 70,
+          "fill": "#0A0F1C",
+          "stroke": {
+            "thickness": 1,
+            "fill": "#FFFFFF14"
+          },
+          "padding": [
+            0,
+            16
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "id_voice_btn_main",
+              "name": "voice_input_btn",
+              "width": 240,
+              "height": 48,
+              "fill": "#22D3EE1A",
+              "cornerRadius": 14,
+              "stroke": {
+                "thickness": 1.5,
+                "fill": "#22D3EE80"
+              },
+              "justifyContent": "center",
+              "gap": 8,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon_font",
+                  "id": "id_vb_ico",
+                  "name": "mic_ico",
+                  "width": 18,
+                  "height": 18,
+                  "iconFontName": "mic",
+                  "iconFontFamily": "lucide",
+                  "fill": "#22D3EE"
+                },
+                {
+                  "type": "text",
+                  "id": "id_vb_txt",
+                  "name": "mic_str",
+                  "fill": "#22D3EE",
+                  "content": "轻触开始语音",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "700"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "id_send_btn_clean",
+              "name": "send_btn",
+              "width": 105,
+              "height": 48,
+              "fill": "#06B6D4",
+              "cornerRadius": 14,
+              "justifyContent": "center",
+              "gap": 6,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon_font",
+                  "id": "id_sb_ico",
+                  "name": "snd_ico",
+                  "width": 16,
+                  "height": 16,
+                  "iconFontName": "send",
+                  "iconFontFamily": "lucide",
+                  "fill": "#FFFFFF"
+                },
+                {
+                  "type": "text",
+                  "id": "id_sb_txt",
+                  "name": "snd_txt",
+                  "fill": "#FFFFFF",
+                  "content": "发送",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "700"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "iphone_with_history",
+      "x": 430,
+      "y": 0,
+      "name": "iPhone Client (有历史记录态 - 历史流上浮·输入框沉底)",
       "clip": true,
       "width": 393,
       "height": 852,
@@ -672,7 +1298,7 @@
     {
       "type": "frame",
       "id": "iphone_listening",
-      "x": 430,
+      "x": 860,
       "y": 0,
       "name": "iPhone Client (录音态 - 语音条声波高亮态)",
       "clip": true,
@@ -1340,7 +1966,7 @@
     {
       "type": "frame",
       "id": "iphone_keyboard",
-      "x": 860,
+      "x": 1290,
       "y": 0,
       "name": "iPhone Client (键盘弹起态 - 随动顶栏与原生键盘无缝对齐)",
       "clip": true,
@@ -1721,7 +2347,7 @@
     {
       "type": "frame",
       "id": "FmSgu",
-      "x": 1290,
+      "x": 1720,
       "y": 0,
       "name": "mDNS Selection",
       "clip": true,
@@ -2120,7 +2746,7 @@
     {
       "type": "frame",
       "id": "vocal_ui_kit",
-      "x": 1720,
+      "x": 2150,
       "y": 0,
       "name": "UI Kit (暗黑科技风 Feedback & Toast 设计规范)",
       "clip": true,

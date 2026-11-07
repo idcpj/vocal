@@ -69,22 +69,32 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
             children: [
               _buildHeader(),
               Expanded(
-                child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 18),
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 8),
-                      // 1. History Section at Top (Browser & Reference Area)
-                      if (_ctrl.historyList.isNotEmpty) ...[
-                        _buildHistorySection(),
-                        const SizedBox(height: 14),
-                      ],
-                      // 2. Draft Editor Card at Bottom (Thumb Heat Zone)
-                      _buildEditorCard(hasText: hasText),
-                      const SizedBox(height: 16),
-                    ],
-                  ),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    return SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(horizontal: 18),
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                        child: IntrinsicHeight(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              const SizedBox(height: 8),
+                              // 1. History Section at Top (Always visible with empty state)
+                              _buildHistorySection(),
+                              const SizedBox(height: 14),
+                              // Spacer keeps the editor card docked at the bottom when content is short
+                              const Spacer(),
+                              // 2. Draft Editor Card at Bottom (Thumb Heat Zone)
+                              _buildEditorCard(hasText: hasText),
+                              const SizedBox(height: 14),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
               // 3. Dual-Action Bottom Bar (Voice + Send)
@@ -733,6 +743,8 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
   // ─── History Section ─────────────────────────────────────
 
   Widget _buildHistorySection() {
+    final hasHistory = _ctrl.historyList.isNotEmpty;
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -766,73 +778,108 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
                   ),
                 ],
               ),
-              GestureDetector(
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  _ctrl.clearHistory();
-                },
-                child: Text(
-                  '清空记录',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.3),
-                    fontSize: 10,
+              if (hasHistory)
+                GestureDetector(
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    _ctrl.clearHistory();
+                  },
+                  child: Text(
+                    '清空记录',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.3),
+                      fontSize: 10,
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
-          const SizedBox(height: 8),
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _ctrl.historyList.length > 3 ? 3 : _ctrl.historyList.length,
-            separatorBuilder: (context, index) =>
-                const Divider(color: Color(0x0DFFFFFF), height: 10),
-            itemBuilder: (context, index) {
-              final itemText = _ctrl.historyList[index];
-              return InkWell(
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  _ctrl.setText(itemText);
-                  _textController.text = itemText;
-                  _textController.selection = TextSelection.collapsed(
-                    offset: itemText.length,
-                  );
-                },
-                borderRadius: BorderRadius.circular(8),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.subdirectory_arrow_right_rounded,
-                        size: 13,
-                        color: Colors.white.withValues(alpha: 0.3),
+          const SizedBox(height: 10),
+          if (!hasHistory)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.chat_bubble_outline_rounded,
+                      size: 22,
+                      color: Colors.white.withValues(alpha: 0.2),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '暂无历史消息',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.5),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
                       ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          itemText,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.7),
-                            fontSize: 12,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '发送成功后的文字将自动留存于此',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.25),
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _ctrl.historyList.length > 3 ? 3 : _ctrl.historyList.length,
+              separatorBuilder: (context, index) =>
+                  const Divider(color: Color(0x0DFFFFFF), height: 10),
+              itemBuilder: (context, index) {
+                final itemText = _ctrl.historyList[index];
+                return InkWell(
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    _ctrl.setText(itemText);
+                    _textController.text = itemText;
+                    _textController.selection = TextSelection.collapsed(
+                      offset: itemText.length,
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.subdirectory_arrow_right_rounded,
+                          size: 13,
+                          color: Colors.white.withValues(alpha: 0.3),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            itemText,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.7),
+                              fontSize: 12,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 6),
-                      Icon(
-                        Icons.north_west_rounded,
-                        size: 11,
-                        color: const Color(0xFF22D3EE).withValues(alpha: 0.5),
-                      ),
-                    ],
+                        const SizedBox(width: 6),
+                        Icon(
+                          Icons.north_west_rounded,
+                          size: 11,
+                          color: const Color(0xFF22D3EE).withValues(alpha: 0.5),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              );
-            },
-          ),
+                );
+              },
+            ),
         ],
       ),
     );
