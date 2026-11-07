@@ -74,7 +74,13 @@ class VocalHomeController extends ChangeNotifier {
   String _textDraft = '';
 
   /// Base text accumulated before the current listening session started.
-  String _baseText = '';
+  String _sessionBaseText = '';
+
+  /// Current session recognized words.
+  String _currentSessionWords = '';
+
+  /// Guard to prevent engine stop/final callbacks from duplicating text.
+  bool _isSessionFinalized = false;
 
   final List<String> _historyList = [];
   Timer? _debounceTimer;
@@ -109,21 +115,24 @@ class VocalHomeController extends ChangeNotifier {
   /// Update the current draft text (e.g. when typing or editing in TextField).
   void updateText(String text) {
     _textDraft = text;
-    _baseText = text;
+    _sessionBaseText = text;
+    _currentSessionWords = '';
     notifyListeners();
   }
 
   /// Explicitly set the text (e.g. from history click).
   void setText(String text) {
     _textDraft = text;
-    _baseText = text;
+    _sessionBaseText = text;
+    _currentSessionWords = '';
     notifyListeners();
   }
 
   /// Clear the current draft text and reset speech base.
   void clearText() {
     _textDraft = '';
-    _baseText = '';
+    _sessionBaseText = '';
+    _currentSessionWords = '';
     _lastWords = '';
     notifyListeners();
   }
@@ -355,7 +364,9 @@ class VocalHomeController extends ChangeNotifier {
   // ─── Listening (STT) ────────────────────────────────────
 
   Future<void> startListening() async {
-    _baseText = _textDraft;
+    _sessionBaseText = _textDraft;
+    _currentSessionWords = '';
+    _isSessionFinalized = false;
     _wantsListening = true;
     notifyListeners();
     await _beginListenSession();
@@ -363,11 +374,7 @@ class VocalHomeController extends ChangeNotifier {
 
   Future<void> stopListening() async {
     _wantsListening = false;
-    _debounceTimer?.cancel();
-    await _speechToText.stop();
-    _baseText = _textDraft;
-    _lastWords = '';
-    notifyListeners();
+    _finalizeLocalSpeech();
   }
 
   /// Internal: start a single STT listen session.
@@ -396,28 +403,18 @@ class VocalHomeController extends ChangeNotifier {
 
   // ─── Speech Result Handling (Debounce & Draft Accumulation) ──
 
-  void _onSpeechResult(SpeechRecognitionResult result) async {
+  void _onSpeechResult(SpeechRecognitionResult result) {
+    if (_isSessionFinalized) {
+      debugPrint('Ignoring post-finalization speech result: "${result.recognizedWords}"');
+      return;
+    }
+
     final newWords = result.recognizedWords;
+    _currentSessionWords = newWords;
     _lastWords = newWords;
 
-    // Combine base draft text with newly recognized speech
-    if (_baseText.trim().isEmpty) {
-      _textDraft = newWords;
-    } else {
-      final trimmedBase = _baseText.trimRight();
-      final lastChar =
-          trimmedBase.isNotEmpty ? trimmedBase.substring(trimmedBase.length - 1) : '';
-      final firstChar =
-          newWords.isNotEmpty ? newWords.substring(0, 1) : '';
-      final isBaseCjk = RegExp(r'[\u4e00-\u9fa5]').hasMatch(lastChar);
-      final isNewCjk = RegExp(r'[\u4e00-\u9fa5]').hasMatch(firstChar);
-
-      if (isBaseCjk && isNewCjk) {
-        _textDraft = '$trimmedBase$newWords';
-      } else {
-        _textDraft = '$trimmedBase $newWords';
-      }
-    }
+    // Combine base text (before this session) with current session words
+    _textDraft = _combineBaseAndSpoken(_sessionBaseText, newWords);
     notifyListeners();
 
     // Reset debounce timer on every result
@@ -436,14 +433,51 @@ class VocalHomeController extends ChangeNotifier {
     }
   }
 
+  /// Smart helper to cleanly combine base text with newly spoken text
+  String _combineBaseAndSpoken(String base, String spoken) {
+    final trimmedSpoken = spoken.trim();
+    if (trimmedSpoken.isEmpty) return base;
+    final trimmedBase = base.trimRight();
+    if (trimmedBase.isEmpty) return trimmedSpoken;
+
+    final lastChar = trimmedBase.substring(trimmedBase.length - 1);
+    final firstChar = trimmedSpoken.substring(0, 1);
+    final isBaseCjk = RegExp(r'[\u4e00-\u9fa5]').hasMatch(lastChar);
+    final isSpokenCjk = RegExp(r'[\u4e00-\u9fa5]').hasMatch(firstChar);
+
+    if (isBaseCjk && isSpokenCjk) {
+      return '$trimmedBase$trimmedSpoken';
+    } else {
+      return '$trimmedBase $trimmedSpoken';
+    }
+  }
+
   /// Finalize current spoken sentence into the draft without sending to Mac.
   /// Allows user to review and edit before manually clicking Send.
   void _finalizeLocalSpeech() {
-    _baseText = _textDraft;
+    if (_isSessionFinalized) return;
+    _isSessionFinalized = true;
+    _debounceTimer?.cancel();
+
+    _textDraft = _combineBaseAndSpoken(_sessionBaseText, _currentSessionWords);
+    _sessionBaseText = _textDraft;
+    _currentSessionWords = '';
     _lastWords = '';
     _wantsListening = false;
     _speechToText.stop();
     notifyListeners();
+  }
+
+  @visibleForTesting
+  void handleSpeechResultForTesting(SpeechRecognitionResult result) {
+    _onSpeechResult(result);
+  }
+
+  @visibleForTesting
+  void setSessionBaseTextForTesting(String text) {
+    _sessionBaseText = text;
+    _textDraft = text;
+    _isSessionFinalized = false;
   }
 
   // ─── Manual Send to Mac ──────────────────────────────────
@@ -481,7 +515,7 @@ class VocalHomeController extends ChangeNotifier {
 
     // Clear draft after successful transmission
     _textDraft = '';
-    _baseText = '';
+    _sessionBaseText = '';
     _lastWords = '';
     notifyListeners();
     return true;

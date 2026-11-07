@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:vocal/page/vocal_home_controller.dart';
 
@@ -55,6 +56,32 @@ void main() {
       expect(ctrl.sendCurrentDraft(), isFalse);
       // Draft should remain intact if not sent
       expect(ctrl.textDraft, '测试未连接发送');
+      ctrl.dispose();
+    });
+
+    test('speech results should not duplicate words upon finalization and post-stop callbacks', () {
+      final ctrl = VocalHomeController(autoInit: false);
+      ctrl.setSessionBaseTextForTesting('');
+
+      // 1. First partial result
+      const words = '好的按你说的处理';
+      final partialResult = SpeechRecognitionResult([
+        SpeechRecognitionWords(words, null, 1.0),
+      ], false);
+      ctrl.handleSpeechResultForTesting(partialResult);
+      expect(ctrl.textDraft, '好的按你说的处理');
+
+      // 2. Final result from engine
+      final finalResult = SpeechRecognitionResult([
+        SpeechRecognitionWords(words, null, 1.0),
+      ], true);
+      ctrl.handleSpeechResultForTesting(finalResult);
+      expect(ctrl.textDraft, '好的按你说的处理');
+
+      // 3. Spurious post-stop event from iOS engine with same text
+      ctrl.handleSpeechResultForTesting(finalResult);
+      expect(ctrl.textDraft, '好的按你说的处理'); // MUST NOT be duplicated!
+
       ctrl.dispose();
     });
   });
