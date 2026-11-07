@@ -474,9 +474,11 @@ class VocalHomeController extends ChangeNotifier {
   // ─── Manual Send to Mac ──────────────────────────────────
 
   /// Manually send the current draft text to the connected Mac host.
+  /// If [directText] is provided, it takes precedence over [_textDraft].
   /// Returns true if successfully sent, false if empty or not connected.
-  bool sendCurrentDraft() {
-    final textToSend = _textDraft.trim();
+  bool sendCurrentDraft([String? directText]) {
+    final rawText = directText ?? _textDraft;
+    final textToSend = rawText.trim();
     if (textToSend.isEmpty) {
       return false;
     }

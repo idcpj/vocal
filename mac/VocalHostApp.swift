@@ -41,7 +41,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
     }
     
     func applicationDidFinishLaunching(_ notification: Notification) {
-        print("Vocal Host finished launching.")
+        setupLogging()
+        print("\n=== Vocal Host Starting at \(Date()) ===")
+        fflush(stdout)
         
         // Ensure the app shows in the status bar even without a bundle
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -59,6 +61,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
     
+    func setupLogging() {
+        let logPath = NSHomeDirectory() + "/.vocalhost.log"
+        freopen(logPath.cString(using: .utf8), "a+", stdout)
+        freopen(logPath.cString(using: .utf8), "a+", stderr)
+        setvbuf(stdout, nil, _IONBF, 0)
+        setvbuf(stderr, nil, _IONBF, 0)
+    }
+
     func updateIcon(connected: Bool) {
         if let button = statusItem?.button {
             let config = NSImage.SymbolConfiguration(pointSize: 15, weight: .regular)
@@ -75,9 +85,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
         statusMenuItem.isEnabled = false
         menu.addItem(statusMenuItem)
         
-        menu.addItem(NSMenuItem.separator())
-        
-        let permissionItem = NSMenuItem(title: MacI18n.checkPermissions, action: #selector(checkPermissions), keyEquivalent: "p")
+        let isTrusted = AXIsProcessTrusted()
+        let permTitle = isTrusted
+            ? (MacI18n.isChinese ? "🟢 辅助功能权限已就绪" : "🟢 Accessibility Ready")
+            : (MacI18n.isChinese ? "🔴 辅助功能未授权 (点击去授权)" : "🔴 Accessibility Required (Click)")
+        let permissionItem = NSMenuItem(title: permTitle, action: #selector(checkPermissions), keyEquivalent: "p")
         menu.addItem(permissionItem)
         
         menu.addItem(NSMenuItem.separator())
@@ -194,26 +206,33 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
     
     func injectText(_ text: String) {
         if !AXIsProcessTrusted() {
-            print("⚠️ WARNING: Accessibility permission is NOT trusted! Text injection may fail.")
+            print("⚠️ WARNING: Accessibility permission is NOT trusted! Text injection will be blocked by macOS.")
             fflush(stdout)
+            checkPermissions()
+            return
         }
         print("Injecting text: \(text)")
         fflush(stdout)
         let source = CGEventSource(stateID: .combinedSessionState)
         
-        for char in text.utf16 {
+        for char in text {
+            let unichars = Array(char.utf16)
             let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true)
-            keyDown?.keyboardSetUnicodeString(stringLength: 1, unicodeString: [char])
+            keyDown?.keyboardSetUnicodeString(stringLength: unichars.count, unicodeString: unichars)
             keyDown?.post(tap: .cgAnnotatedSessionEventTap)
             
             let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false)
-            keyUp?.keyboardSetUnicodeString(stringLength: 1, unicodeString: [char])
+            keyUp?.keyboardSetUnicodeString(stringLength: unichars.count, unicodeString: unichars)
             keyUp?.post(tap: .cgAnnotatedSessionEventTap)
+            
+            // 2ms slight delay between characters to allow focused application to process event stream
+            usleep(2000)
         }
     }
 
     func pressReturnKey() {
         print("Simulating Return key...")
+        fflush(stdout)
         let source = CGEventSource(stateID: .combinedSessionState)
         let returnKeyCode: CGKeyCode = 0x24 // kVK_Return
         
@@ -223,7 +242,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
         let keyDown = CGEvent(keyboardEventSource: source, virtualKey: returnKeyCode, keyDown: true)
         keyDown?.post(tap: .cgAnnotatedSessionEventTap)
         
-        usleep(10000) // 10ms
+        usleep(15000) // 15ms
         
         let keyUp = CGEvent(keyboardEventSource: source, virtualKey: returnKeyCode, keyDown: false)
         keyUp?.post(tap: .cgAnnotatedSessionEventTap)
@@ -255,6 +274,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
                 NSWorkspace.shared.open(url)
             }
         }
+        updateMenu()
     }
 
     // MARK: - Heartbeat
@@ -263,9 +283,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             self.heartbeatTimer?.invalidate()
-            self.heartbeatTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+            let timer = Timer(timeInterval: 5.0, repeats: true) { [weak self] _ in
                 self?.sendPing()
             }
+            RunLoop.main.add(timer, forMode: .common)
+            self.heartbeatTimer = timer
             print("Heartbeat started.")
         }
     }

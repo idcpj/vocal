@@ -629,7 +629,7 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
           ? () {
               HapticFeedback.mediumImpact();
               final willPressEnter = _ctrl.autoPressEnter;
-              final success = _ctrl.sendCurrentDraft();
+              final success = _ctrl.sendCurrentDraft(_textController.text);
               if (success) {
                 _textController.clear();
                 FocusScope.of(context).unfocus();

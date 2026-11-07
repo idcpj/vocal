@@ -19,8 +19,15 @@ echo "📄 Copying Info.plist and Icon..."
 cp mac/Info.plist "${APP_BUNDLE}/Contents/Info.plist"
 cp mac/AppIcon.icns "${APP_BUNDLE}/Contents/Resources/AppIcon.icns"
 
-echo "🔐 Ad-hoc code signing..."
-codesign --force --deep --sign - "${APP_BUNDLE}"
+echo "🔐 Code signing..."
+SIGNING_IDENTITY=$(security find-identity -v -p codesigning | grep "Apple Development" | head -n 1 | awk -F'"' '{print $2}')
+if [ -n "$SIGNING_IDENTITY" ]; then
+    echo "Using development identity: ${SIGNING_IDENTITY}"
+    codesign --force --deep --sign "${SIGNING_IDENTITY}" "${APP_BUNDLE}"
+else
+    echo "Using ad-hoc signing..."
+    codesign --force --deep --sign - "${APP_BUNDLE}"
+fi
 
 echo "💿 Creating DMG..."
 DMG_STAGING_DIR="${BUILD_DIR}/dmg_staging"
