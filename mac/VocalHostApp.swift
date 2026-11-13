@@ -7,6 +7,8 @@ struct HostConfig {
     var port: UInt16 = 8888
     var mockInject: Bool = false
     var pingInterval: TimeInterval = 5.0
+    var requirePin: Bool = false
+    var pinCode: String? = nil
     
     static func parse(arguments: [String]) -> HostConfig {
         var config = HostConfig()
@@ -17,6 +19,18 @@ struct HostConfig {
                 config.isTestMode = true
             } else if arg == "--no-cg-inject" || arg == "--mock-inject" {
                 config.mockInject = true
+            } else if arg == "--require-pin" {
+                config.requirePin = true
+            } else if arg == "--pin" {
+                i += 1
+                if i < arguments.count {
+                    config.pinCode = arguments[i]
+                    config.requirePin = true
+                }
+            } else if arg.starts(with: "--pin=") {
+                let val = String(arg.dropFirst("--pin=".count))
+                config.pinCode = val
+                config.requirePin = true
             } else if arg == "--port" {
                 i += 1
                 if i < arguments.count, let p = UInt16(arguments[i]), p > 0 {
@@ -54,6 +68,8 @@ struct HostConfig {
           --port <PORT>            Specify listening WebSocket port (default: 8888)
           --no-cg-inject           Mock key injection without system CGEvent/Accessibility calls
           --ping-interval <SEC>    Heartbeat ping interval in seconds (default: 5.0)
+          --require-pin            Enforce PIN code authentication for connections
+          --pin <PIN>              Specify fixed 4-digit PIN for testing (enables PIN protection)
           -h, --help               Show help information
         """)
     }
@@ -73,6 +89,10 @@ struct MacI18n {
     static var checkPermissions: String { isChinese ? "检查辅助功能权限" : "Check Permissions" }
     static var quitVocal: String { isChinese ? "退出 Vocal" : "Quit Vocal" }
     static var accessibilityDescription: String { isChinese ? "Vocal 语音输入宿主" : "Vocal Host" }
+    static var pinProtection: String { isChinese ? "启用 PIN 码保护" : "Enable PIN Protection" }
+    static var currentPin: String { isChinese ? "PIN 码: " : "PIN Code: " }
+    static var refreshPin: String { isChinese ? "刷新 PIN 码" : "Refresh PIN" }
+    static var clearTrustedDevices: String { isChinese ? "清除所有已配对设备" : "Clear All Paired Devices" }
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
@@ -88,6 +108,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
         didSet { updateMenu() }
     }
     
+    // MARK: - PIN Protection & Auth State
+    var isPinProtectionEnabled: Bool = false
+    var currentPin: String = "8492"
+    var trustedTokens: Set<String> = []
+    var isConnectionAuthenticated: Bool = false
+    var failedPinAttempts: Int = 0
+    
     private(set) var currentState: String = "DISCONNECTED"
     var isConnected: Bool {
         return currentState == "CONNECTED"
@@ -96,6 +123,27 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
     init(config: HostConfig = HostConfig()) {
         self.config = config
         super.init()
+        
+        // Initialize PIN protection state from config or UserDefaults
+        let defaults = UserDefaults.standard
+        if config.requirePin {
+            self.isPinProtectionEnabled = true
+        } else {
+            self.isPinProtectionEnabled = defaults.bool(forKey: "vocal_pin_enabled")
+        }
+        
+        if let pin = config.pinCode, !pin.isEmpty {
+            self.currentPin = pin
+        } else if let savedPin = defaults.string(forKey: "vocal_current_pin"), !savedPin.isEmpty {
+            self.currentPin = savedPin
+        } else {
+            self.currentPin = String(format: "%04d", Int.random(in: 1000...9999))
+            defaults.set(self.currentPin, forKey: "vocal_current_pin")
+        }
+        
+        if let tokens = defaults.stringArray(forKey: "vocal_trusted_tokens") {
+            self.trustedTokens = Set(tokens)
+        }
     }
     
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -235,10 +283,58 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
         
         menu.addItem(NSMenuItem.separator())
         
+        // PIN Protection Toggle
+        let pinToggleItem = NSMenuItem(title: MacI18n.pinProtection, action: #selector(togglePinProtection), keyEquivalent: "")
+        pinToggleItem.state = isPinProtectionEnabled ? .on : .off
+        menu.addItem(pinToggleItem)
+        
+        if isPinProtectionEnabled {
+            let pinItem = NSMenuItem(title: "\(MacI18n.currentPin)\(currentPin) (\(MacI18n.refreshPin))", action: #selector(refreshCurrentPin), keyEquivalent: "")
+            menu.addItem(pinItem)
+            
+            let clearItem = NSMenuItem(title: MacI18n.clearTrustedDevices, action: #selector(clearAllTrustedDevices), keyEquivalent: "")
+            menu.addItem(clearItem)
+        }
+        
+        menu.addItem(NSMenuItem.separator())
+        
         let quitItem = NSMenuItem(title: MacI18n.quitVocal, action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         menu.addItem(quitItem)
         
         statusItem?.menu = menu
+    }
+    
+    @objc func togglePinProtection() {
+        isPinProtectionEnabled.toggle()
+        UserDefaults.standard.set(isPinProtectionEnabled, forKey: "vocal_pin_enabled")
+        print("PIN Protection toggled: \(isPinProtectionEnabled)")
+        emitTestEvent([
+            "vocal_event": "PIN_PROTECTION_TOGGLED",
+            "enabled": isPinProtectionEnabled,
+            "pin": currentPin
+        ])
+        updateMenu()
+    }
+    
+    @objc func refreshCurrentPin() {
+        currentPin = String(format: "%04d", Int.random(in: 1000...9999))
+        UserDefaults.standard.set(currentPin, forKey: "vocal_current_pin")
+        print("PIN refreshed to: \(currentPin)")
+        emitTestEvent([
+            "vocal_event": "PIN_REFRESHED",
+            "pin": currentPin
+        ])
+        updateMenu()
+    }
+    
+    @objc func clearAllTrustedDevices() {
+        trustedTokens.removeAll()
+        UserDefaults.standard.removeObject(forKey: "vocal_trusted_tokens")
+        print("All trusted paired devices cleared.")
+        emitTestEvent([
+            "vocal_event": "TRUSTED_DEVICES_CLEARED"
+        ])
+        updateMenu()
     }
     
     func startWebSocketServer() {
@@ -281,12 +377,44 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
                     switch state {
                     case .ready:
                         print("WebSocket connection established and ready.")
+                        // Check if host is already occupied by an active connection
+                        if self.isConnected && self.connectedConnection != nil && self.connectedConnection !== connection {
+                            print("⚠️ Connection rejected: Host is already occupied by an active client.")
+                            self.emitTestEvent([
+                                "vocal_event": "CONNECTION_REJECTED",
+                                "reason": "OCCUPIED"
+                            ])
+                            let occupiedPayload = "{\"type\":\"error\",\"code\":\"OCCUPIED\",\"message\":\"Host is occupied by another device\"}"
+                            let data = occupiedPayload.data(using: .utf8) ?? Data()
+                            let metadata = NWProtocolWebSocket.Metadata(opcode: .text)
+                            let context = NWConnection.ContentContext(identifier: "occupiedError", metadata: [metadata])
+                            connection.send(content: data, contentContext: context, isComplete: true, completion: .contentProcessed({ error in
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                    print("Closed rejected secondary connection.")
+                                    connection.cancel()
+                                }
+                            }))
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                connection.cancel()
+                            }
+                            return
+                        }
+
                         // Cancel old connection if existing and different
                         if let old = self.connectedConnection, old !== connection {
                             print("Closing previous connection.")
                             old.cancel()
                         }
                         self.connectedConnection = connection
+                        // Reset authentication state for new connection
+                        if self.isPinProtectionEnabled {
+                            self.isConnectionAuthenticated = false
+                            self.failedPinAttempts = 0
+                            print("PIN Protection active: connection requires PIN or trusted token.")
+                        } else {
+                            self.isConnectionAuthenticated = true
+                            self.failedPinAttempts = 0
+                        }
                         self.receive(on: connection)
                         self.transitionState(to: "CONNECTED", reason: "HANDSHAKE_COMPLETED")
                     case .failed(let error):
@@ -318,6 +446,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
         }
     }
     
+    func sendJson(to connection: NWConnection, object: [String: Any]) {
+        guard let data = try? JSONSerialization.data(withJSONObject: object, options: []) else { return }
+        let metadata = NWProtocolWebSocket.Metadata(opcode: .text)
+        let context = NWConnection.ContentContext(identifier: "textFrame", metadata: [metadata])
+        connection.send(content: data, contentContext: context, isComplete: true, completion: .contentProcessed({ error in
+            if let error = error {
+                print("Failed to send JSON frame: \(error)")
+            }
+        }))
+    }
+    
     func receive(on connection: NWConnection) {
         connection.receiveMessage { [weak self] (data, context, isComplete, error) in
             guard let self = self else { return }
@@ -334,35 +473,131 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
                     var didHandleJson = false
                     if let jsonData = message.data(using: .utf8),
                        let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-                       let type = json["type"] as? String, type == "text" {
-                        self.emitTestEvent([
-                            "vocal_event": "PAYLOAD_RECEIVED",
-                            "mode": "JSON",
-                            "raw": message
-                        ])
-                        let text = json["text"] as? String ?? ""
-                        let pressEnter = json["pressEnter"] as? Bool ?? false
-                        if !text.isEmpty {
-                            print("Injecting text from JSON: \(text), pressEnter: \(pressEnter)")
-                            fflush(stdout)
-                            self.injectText(text)
+                       let type = json["type"] as? String {
+                        
+                        if type == "auth_request" {
+                            didHandleJson = true
+                            let token = json["token"] as? String ?? ""
+                            let deviceId = json["deviceId"] as? String ?? ""
+                            let deviceName = json["deviceName"] as? String ?? ""
+                            
+                            if !self.isPinProtectionEnabled {
+                                self.isConnectionAuthenticated = true
+                                self.sendJson(to: connection, object: ["type": "auth_success", "mode": "open"])
+                                self.emitTestEvent([
+                                    "vocal_event": "AUTH_SUCCESS",
+                                    "mode": "open",
+                                    "deviceId": deviceId
+                                ])
+                            } else if !token.isEmpty && self.trustedTokens.contains(token) {
+                                self.isConnectionAuthenticated = true
+                                self.sendJson(to: connection, object: ["type": "auth_success", "mode": "trusted"])
+                                self.emitTestEvent([
+                                    "vocal_event": "AUTH_SUCCESS",
+                                    "mode": "trusted",
+                                    "deviceId": deviceId
+                                ])
+                            } else {
+                                self.isConnectionAuthenticated = false
+                                self.sendJson(to: connection, object: ["type": "auth_require_pin"])
+                                self.emitTestEvent([
+                                    "vocal_event": "AUTH_REQUIRED",
+                                    "deviceId": deviceId,
+                                    "deviceName": deviceName
+                                ])
+                            }
+                        } else if type == "auth_verify_pin" {
+                            didHandleJson = true
+                            let submittedPin = (json["pin"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                            if self.isPinProtectionEnabled && submittedPin == self.currentPin {
+                                self.isConnectionAuthenticated = true
+                                self.failedPinAttempts = 0
+                                let newToken = "token_" + UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
+                                self.trustedTokens.insert(newToken)
+                                UserDefaults.standard.set(Array(self.trustedTokens), forKey: "vocal_trusted_tokens")
+                                self.sendJson(to: connection, object: ["type": "auth_success", "token": newToken])
+                                self.emitTestEvent([
+                                    "vocal_event": "AUTH_SUCCESS",
+                                    "mode": "pin",
+                                    "token": newToken
+                                ])
+                            } else {
+                                self.failedPinAttempts += 1
+                                let remaining = max(0, 3 - self.failedPinAttempts)
+                                self.emitTestEvent([
+                                    "vocal_event": "AUTH_FAILED",
+                                    "reason": "INVALID_PIN",
+                                    "remainingAttempts": remaining
+                                ])
+                                if remaining > 0 {
+                                    self.sendJson(to: connection, object: [
+                                        "type": "auth_failed",
+                                        "reason": MacI18n.isChinese ? "PIN 码错误" : "Incorrect PIN",
+                                        "remainingAttempts": remaining
+                                    ])
+                                } else {
+                                    self.sendJson(to: connection, object: [
+                                        "type": "auth_failed",
+                                        "reason": MacI18n.isChinese ? "输错次数过多，连接已断开" : "Too many attempts, connection terminated",
+                                        "remainingAttempts": 0
+                                    ])
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                        connection.cancel()
+                                    }
+                                }
+                            }
+                        } else if type == "text" {
+                            // Check auth gate
+                            if self.isPinProtectionEnabled && !self.isConnectionAuthenticated {
+                                print("🛑 BLOCKED: Unauthorized text injection attempted while PIN protection is active!")
+                                fflush(stdout)
+                                self.emitTestEvent([
+                                    "vocal_event": "AUTH_BLOCKED",
+                                    "reason": "NOT_AUTHENTICATED"
+                                ])
+                                self.sendJson(to: connection, object: ["type": "auth_require_pin"])
+                                didHandleJson = true
+                            } else {
+                                self.emitTestEvent([
+                                    "vocal_event": "PAYLOAD_RECEIVED",
+                                    "mode": "JSON",
+                                    "raw": message
+                                ])
+                                let text = json["text"] as? String ?? ""
+                                let pressEnter = json["pressEnter"] as? Bool ?? false
+                                if !text.isEmpty {
+                                    print("Injecting text from JSON: \(text), pressEnter: \(pressEnter)")
+                                    fflush(stdout)
+                                    self.injectText(text)
+                                }
+                                if pressEnter {
+                                    self.pressReturnKey()
+                                }
+                                didHandleJson = true
+                            }
                         }
-                        if pressEnter {
-                            self.pressReturnKey()
-                        }
-                        didHandleJson = true
                     }
                     
                     // Fallback to plain text if not handled as JSON
                     if !didHandleJson && !message.isEmpty {
-                        print("Injecting fallback plain text: \(message)")
-                        fflush(stdout)
-                        self.emitTestEvent([
-                            "vocal_event": "PAYLOAD_RECEIVED",
-                            "mode": "PLAIN_TEXT",
-                            "raw": message
-                        ])
-                        self.injectText(message)
+                        if self.isPinProtectionEnabled && !self.isConnectionAuthenticated {
+                            print("🛑 BLOCKED: Unauthorized plain text injection attempted while PIN protection is active!")
+                            fflush(stdout)
+                            self.emitTestEvent([
+                                "vocal_event": "AUTH_BLOCKED",
+                                "reason": "NOT_AUTHENTICATED"
+                            ])
+                            self.sendJson(to: connection, object: ["type": "auth_require_pin"])
+                        } else {
+                            print("Injecting fallback plain text: \(message)")
+                            fflush(stdout)
+                            self.emitTestEvent([
+                                "vocal_event": "PAYLOAD_RECEIVED",
+                                "mode": "PLAIN_TEXT",
+                                "raw": message
+                            ])
+                            self.injectText(message)
+                        }
                     }
                 }
             }

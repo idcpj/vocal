@@ -18,6 +18,7 @@ from tests.e2e.host_process import compile_mac_host
 from tests.e2e.test_handshake_state import run_handshake_state_tests
 from tests.e2e.test_payload_inject import run_payload_inject_tests
 from tests.e2e.test_heartbeat_reconnect import run_heartbeat_reconnect_tests
+from tests.e2e.test_pin_pairing import run_all_pin_tests
 
 
 async def main() -> int:
@@ -44,6 +45,14 @@ async def main() -> int:
 
     # 4. Heartbeat & Reconnect
     results["心跳保活与故障自愈 (TC-03, TC-08)"] = await run_heartbeat_reconnect_tests(base_port=19300)
+
+    # 5. PIN Pairing & Auth Gate Security (PRD-07)
+    try:
+        await run_all_pin_tests()
+        results["PIN码安全配对与鉴权门禁 (TC-11~16)"] = True
+    except Exception as e:
+        print(f"❌ PIN 配对测试失败: {e}")
+        results["PIN码安全配对与鉴权门禁 (TC-11~16)"] = False
 
     # Summary
     duration = time.time() - start_time

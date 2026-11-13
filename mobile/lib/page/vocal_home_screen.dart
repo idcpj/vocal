@@ -6,7 +6,9 @@ import 'package:vocal/page/locale_selection_sheet.dart';
 import 'package:vocal/page/vocal_home_controller.dart';
 
 class VocalHomeScreen extends StatefulWidget {
-  const VocalHomeScreen({super.key});
+  final VocalHomeController? controller;
+
+  const VocalHomeScreen({super.key, this.controller});
 
   @override
   State<VocalHomeScreen> createState() => _VocalHomeScreenState();
@@ -15,15 +17,24 @@ class VocalHomeScreen extends StatefulWidget {
 class _VocalHomeScreenState extends State<VocalHomeScreen>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final VocalHomeController _ctrl;
+  bool _ownsController = false;
   late final AnimationController _animController;
   late final TextEditingController _textController;
   final FocusNode _focusNode = FocusNode();
+  final ScrollController _historyScrollController = ScrollController();
+  final TextEditingController _pinController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _ctrl = VocalHomeController();
+    if (widget.controller != null) {
+      _ctrl = widget.controller!;
+      _ownsController = false;
+    } else {
+      _ctrl = VocalHomeController();
+      _ownsController = true;
+    }
     _textController = TextEditingController();
     _ctrl.addListener(_onControllerUpdate);
     _animController = AnimationController(
@@ -64,10 +75,14 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _ctrl.removeListener(_onControllerUpdate);
-    _ctrl.dispose();
+    if (_ownsController) {
+      _ctrl.dispose();
+    }
     _animController.dispose();
     _textController.dispose();
     _focusNode.dispose();
+    _historyScrollController.dispose();
+    _pinController.dispose();
     super.dispose();
   }
 
@@ -78,6 +93,7 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
     final hasText = _textController.text.trim().isNotEmpty;
     final canSend = _ctrl.isConnected && hasText;
     final isKeyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
+    final isOccupied = _ctrl.connectionState == VocalConnectionState.occupied;
 
     return Scaffold(
       resizeToAvoidBottomInset: true,
@@ -85,33 +101,282 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
         child: Column(
           children: [
             _buildHeader(),
-            // 1. History Section at Top (Collapses smoothly when keyboard opens)
-            AnimatedCrossFade(
-              duration: const Duration(milliseconds: 200),
-              crossFadeState: isKeyboardOpen
-                  ? CrossFadeState.showSecond
-                  : CrossFadeState.showFirst,
-              firstChild: Padding(
-                padding: const EdgeInsets.fromLTRB(18, 4, 18, 10),
-                child: GestureDetector(
-                  onTap: () => FocusScope.of(context).unfocus(),
-                  behavior: HitTestBehavior.translucent,
-                  child: _buildHistorySection(),
+            if (isOccupied)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 0, 18, 10),
+                child: _buildOccupiedBanner(),
+              ),
+            if (_ctrl.isPinRequired)
+              Expanded(
+                child: _buildPinPairingOverlay(),
+              )
+            else ...[
+              // 1. History Section at Top (Collapses smoothly when keyboard opens)
+              AnimatedCrossFade(
+                duration: const Duration(milliseconds: 200),
+                crossFadeState: isKeyboardOpen
+                    ? CrossFadeState.showSecond
+                    : CrossFadeState.showFirst,
+                firstChild: Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 4, 18, 10),
+                  child: GestureDetector(
+                    onTap: () => FocusScope.of(context).unfocus(),
+                    behavior: HitTestBehavior.translucent,
+                    child: _buildHistorySection(),
+                  ),
+                ),
+                secondChild: const SizedBox(width: double.infinity, height: 0),
+              ),
+              // 2. Draft Editor Card at Bottom (Always single stable tree, zero rebuild flicker)
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 18),
+                  child: _buildEditorCard(hasText: hasText),
                 ),
               ),
-              secondChild: const SizedBox(width: double.infinity, height: 0),
-            ),
-            // 2. Draft Editor Card at Bottom (Always single stable tree, zero rebuild flicker)
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 18),
-                child: _buildEditorCard(hasText: hasText),
-              ),
-            ),
-            const SizedBox(height: 8),
-            // 3. Dual-Action Bottom Bar (Voice + Send / Dismiss Keyboard + Send)
-            _buildBottomActionBar(canSend, isKeyboardOpen),
+              const SizedBox(height: 8),
+              // 3. Dual-Action Bottom Bar (Voice + Send / Dismiss Keyboard + Send)
+              _buildBottomActionBar(canSend, isKeyboardOpen),
+            ],
           ],
+        ),
+      ),
+    );
+  }
+
+  // ─── PIN Pairing View ─────────────────────────────────────
+
+  Widget _buildPinPairingOverlay() {
+    final strings = AppStrings.current;
+    final errMsg = _ctrl.pinErrorMessage;
+    final remaining = _ctrl.pinRemainingAttempts;
+
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        child: Container(
+          width: double.infinity,
+          constraints: const BoxConstraints(maxWidth: 345),
+          padding: const EdgeInsets.fromLTRB(22, 28, 22, 24),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F172A),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: const Color(0xFF22D3EE).withValues(alpha: 0.35),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF22D3EE).withValues(alpha: 0.12),
+                blurRadius: 28,
+                spreadRadius: 2,
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 54,
+                height: 54,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF22D3EE).withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: const Color(0xFF22D3EE).withValues(alpha: 0.25),
+                  ),
+                ),
+                child: const Center(
+                  child: Text(
+                    '🔐',
+                    style: TextStyle(fontSize: 26),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              // Target Device Pill
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.1),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.desktop_mac_rounded,
+                      size: 13,
+                      color: Color(0xFFE2E8F0),
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      _ctrl.statusText.contains('Connected to')
+                          ? 'Mac Host'
+                          : '局域网 Mac 主机',
+                      style: const TextStyle(
+                        color: Color(0xFFE2E8F0),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                strings.pinDialogTitle,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                strings.pinDialogSub,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.55),
+                  fontSize: 12,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 20),
+              // 4-digit PIN input container
+              Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E293B),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: errMsg != null
+                        ? const Color(0xFFEF4444)
+                        : const Color(0xFF22D3EE),
+                    width: 1.5,
+                  ),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                child: TextField(
+                  controller: _pinController,
+                  autofocus: true,
+                  keyboardType: TextInputType.number,
+                  maxLength: 4,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Color(0xFF22D3EE),
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 10,
+                  ),
+                  decoration: InputDecoration(
+                    border: InputBorder.none,
+                    counterText: '',
+                    hintText: strings.pinInputHint,
+                    hintStyle: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      fontSize: 15,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                  onChanged: (val) {
+                    if (val.length == 4) {
+                      HapticFeedback.selectionClick();
+                      _ctrl.verifyPin(val);
+                    }
+                  },
+                ),
+              ),
+              if (errMsg != null) ...[
+                const SizedBox(height: 10),
+                Text(
+                  '$errMsg (${strings.remainingAttempts(remaining)})',
+                  style: const TextStyle(
+                    color: Color(0xFFEF4444),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 18),
+              // Security tip badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF22C55E).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.verified_user_outlined,
+                      size: 13,
+                      color: Color(0xFF4ADE80),
+                    ),
+                    SizedBox(width: 5),
+                    Text(
+                      '局域网端到端鉴权 · 仅首次配对需输码',
+                      style: TextStyle(
+                        color: Color(0xFF4ADE80),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 22),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white.withValues(alpha: 0.6),
+                        side: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                      ),
+                      onPressed: () {
+                        _pinController.clear();
+                        _ctrl.cancelPinVerification();
+                      },
+                      child: Text(strings.cancel),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF22D3EE),
+                        foregroundColor: const Color(0xFF0F172A),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        elevation: 0,
+                      ),
+                      onPressed: () {
+                        if (_pinController.text.trim().isNotEmpty) {
+                          HapticFeedback.selectionClick();
+                          _ctrl.verifyPin(_pinController.text.trim());
+                        }
+                      },
+                      child: Text(
+                        strings.confirmPair,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -170,16 +435,131 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
     );
   }
 
+  Widget _buildOccupiedBanner() {
+    final strings = AppStrings.current;
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: const Color(0x4078350F),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0x4DF59E0B),
+          width: 1,
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.shield_outlined,
+                  size: 20,
+                  color: Color(0xFFF59E0B),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        strings.hostOccupiedPrompt,
+                        style: const TextStyle(
+                          color: Color(0xFFFDE68A),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        strings.hostOccupiedSub,
+                        style: TextStyle(
+                          color: const Color(0xFFFBBF24).withValues(alpha: 0.7),
+                          fontSize: 10,
+                          fontWeight: FontWeight.normal,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: () {
+              HapticFeedback.mediumImpact();
+              _ctrl.retryConnection();
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: const Color(0xFFF59E0B).withValues(alpha: 0.5),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.refresh_rounded,
+                    size: 12,
+                    color: Color(0xFFFDE68A),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    strings.retryConnect,
+                    style: const TextStyle(
+                      color: Color(0xFFFDE68A),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildConnectionBadge() {
     final strings = AppStrings.current;
-    final color = _ctrl.isConnected ? const Color(0xFF22C55E) : const Color(0xFFEF4444);
-    final label = _ctrl.isConnected ? strings.online : strings.offline;
+    final isOccupied = _ctrl.connectionState == VocalConnectionState.occupied;
+    final isConnected = _ctrl.isConnected;
+
+    final Color color;
+    final String label;
+
+    if (isOccupied) {
+      color = const Color(0xFFF59E0B);
+      label = strings.occupied;
+    } else if (_ctrl.isPinRequired) {
+      color = const Color(0xFFEAB308);
+      label = strings.isChinese ? '待配对' : 'PAIRING';
+    } else if (isConnected) {
+      color = const Color(0xFF22C55E);
+      label = strings.online;
+    } else {
+      color = const Color(0xFFEF4444);
+      label = strings.offline;
+    }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(12),
+        border: isOccupied
+            ? Border.all(color: color.withValues(alpha: 0.4), width: 1)
+            : null,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -657,7 +1037,13 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
               final success = _ctrl.sendCurrentDraft(_textController.text);
               if (success) {
                 _textController.clear();
-                FocusScope.of(context).unfocus();
+                if (_historyScrollController.hasClients) {
+                  _historyScrollController.animateTo(
+                    0.0,
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeOut,
+                  );
+                }
                 _showDarkToast(
                   context,
                   willPressEnter ? strings.sentWithEnter : strings.sent,
@@ -813,6 +1199,24 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
                       letterSpacing: 0.5,
                     ),
                   ),
+                  if (hasHistory) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '${_ctrl.historyList.length}',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.5),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
               if (hasHistory)
@@ -866,56 +1270,70 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
               ),
             )
           else
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _ctrl.historyList.length > 3 ? 3 : _ctrl.historyList.length,
-              separatorBuilder: (context, index) =>
-                  const Divider(color: Color(0x0DFFFFFF), height: 10),
-              itemBuilder: (context, index) {
-                final itemText = _ctrl.historyList[index];
-                return InkWell(
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    _ctrl.setText(itemText);
-                    _textController.text = itemText;
-                    _textController.selection = TextSelection.collapsed(
-                      offset: itemText.length,
+            ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxHeight: 120,
+              ),
+              child: RawScrollbar(
+                controller: _historyScrollController,
+                thumbVisibility: _ctrl.historyList.length > 3,
+                thickness: 3,
+                radius: const Radius.circular(2),
+                thumbColor: Colors.white.withValues(alpha: 0.2),
+                child: ListView.separated(
+                  controller: _historyScrollController,
+                  shrinkWrap: true,
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.only(right: 6),
+                  itemCount: _ctrl.historyList.length,
+                  separatorBuilder: (context, index) =>
+                      const Divider(color: Color(0x0DFFFFFF), height: 10),
+                  itemBuilder: (context, index) {
+                    final itemText = _ctrl.historyList[index];
+                    return InkWell(
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        _ctrl.setText(itemText);
+                        _textController.text = itemText;
+                        _textController.selection = TextSelection.collapsed(
+                          offset: itemText.length,
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.subdirectory_arrow_right_rounded,
+                              size: 13,
+                              color: Colors.white.withValues(alpha: 0.3),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                itemText,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.7),
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Icon(
+                              Icons.north_west_rounded,
+                              size: 11,
+                              color: const Color(0xFF22D3EE).withValues(alpha: 0.5),
+                            ),
+                          ],
+                        ),
+                      ),
                     );
                   },
-                  borderRadius: BorderRadius.circular(8),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.subdirectory_arrow_right_rounded,
-                          size: 13,
-                          color: Colors.white.withValues(alpha: 0.3),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            itemText,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.7),
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Icon(
-                          Icons.north_west_rounded,
-                          size: 11,
-                          color: const Color(0xFF22D3EE).withValues(alpha: 0.5),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
+                ),
+              ),
             ),
         ],
       ),

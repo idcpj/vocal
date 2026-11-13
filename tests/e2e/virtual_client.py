@@ -133,6 +133,29 @@ class VirtualMobileClient:
         }, ensure_ascii=False)
         await self.send_text(payload)
 
+    async def send_auth_request(self, device_id: str = "test_device_uuid", device_name: str = "Virtual Client", token: str = "") -> None:
+        """Sends auth_request handshake payload."""
+        payload = json.dumps({
+            "type": "auth_request",
+            "deviceId": device_id,
+            "deviceName": device_name,
+            "token": token
+        })
+        await self.send_text(payload)
+
+    async def send_verify_pin(self, pin: str) -> None:
+        """Submits PIN for verification."""
+        payload = json.dumps({
+            "type": "auth_verify_pin",
+            "pin": pin
+        })
+        await self.send_text(payload)
+
+    async def recv_json_message(self, timeout: float = 5.0) -> Dict[str, Any]:
+        """Receives next text frame and deserializes JSON."""
+        raw = await self.recv_text(timeout=timeout)
+        return json.loads(raw)
+
     async def send_pong(self) -> None:
         """Sends a Pong frame (Opcode 0xA) or JSON pong according to Vocal protocol."""
         # Vocal protocol supports JSON pong: {"type":"pong"}

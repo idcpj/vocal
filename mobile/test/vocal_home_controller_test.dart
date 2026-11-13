@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:speech_to_text/speech_recognition_error.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
+import 'package:vocal/i18n/app_strings.dart';
 import 'package:vocal/page/vocal_home_controller.dart';
 
 void main() {
@@ -32,6 +33,37 @@ void main() {
       final ctrl = VocalHomeController(autoInit: false);
       ctrl.setText('历史文字');
       expect(ctrl.textDraft, '历史文字');
+      ctrl.dispose();
+    });
+
+    test('history list should store multiple items, support LRU reorder, cap at 50, and clear', () {
+      final ctrl = VocalHomeController(autoInit: false);
+      expect(ctrl.historyList, isEmpty);
+
+      // Add 5 distinct items
+      for (int i = 1; i <= 5; i++) {
+        ctrl.addHistoryItemForTesting('指令 $i');
+      }
+      expect(ctrl.historyList.length, 5);
+      expect(ctrl.historyList.first, '指令 5');
+      expect(ctrl.historyList.last, '指令 1');
+
+      // LRU re-order when re-adding '指令 2'
+      ctrl.addHistoryItemForTesting('指令 2');
+      expect(ctrl.historyList.length, 5);
+      expect(ctrl.historyList.first, '指令 2');
+
+      // Add items up to and exceeding limit (55 items)
+      for (int i = 6; i <= 60; i++) {
+        ctrl.addHistoryItemForTesting('指令 $i');
+      }
+      expect(ctrl.historyList.length, VocalHomeController.maxHistoryLength);
+      expect(ctrl.historyList.length, 50);
+      expect(ctrl.historyList.first, '指令 60');
+
+      // Clear history
+      ctrl.clearHistory();
+      expect(ctrl.historyList, isEmpty);
       ctrl.dispose();
     });
 
@@ -233,6 +265,208 @@ void main() {
       // Should automatically transition to searching
       expect(ctrl.connectionState, VocalConnectionState.searching);
 
+      ctrl.dispose();
+    });
+  });
+
+  group('VocalHomeController History Management Tests', () {
+    test('setHistoryForTesting should populate historyList and notify listeners', () {
+      final ctrl = VocalHomeController(autoInit: false);
+      var notified = false;
+      ctrl.addListener(() => notified = true);
+
+      ctrl.setHistoryForTesting(['记录 1', '记录 2', '记录 3']);
+      expect(notified, isTrue);
+      expect(ctrl.historyList, equals(['记录 1', '记录 2', '记录 3']));
+      ctrl.dispose();
+    });
+
+    test('sendCurrentDraft should accumulate multiple history items in LIFO order', () {
+      final ctrl = VocalHomeController(autoInit: false);
+      ctrl.setConnectedForTesting(true);
+
+      // 1. Send first message
+      ctrl.updateText('First Message');
+      expect(ctrl.sendCurrentDraft(), isTrue);
+      expect(ctrl.historyList, equals(['First Message']));
+
+      // 2. Send second message
+      ctrl.updateText('Second Message');
+      expect(ctrl.sendCurrentDraft(), isTrue);
+      expect(ctrl.historyList, equals(['Second Message', 'First Message']));
+
+      // 3. Send third message
+      ctrl.updateText('Third Message');
+      expect(ctrl.sendCurrentDraft(), isTrue);
+      expect(ctrl.historyList, equals(['Third Message', 'Second Message', 'First Message']));
+
+      ctrl.dispose();
+    });
+
+    test('sending existing text should move it to top (LRU deduplication)', () {
+      final ctrl = VocalHomeController(autoInit: false);
+      ctrl.setConnectedForTesting(true);
+      ctrl.setHistoryForTesting(['Item A', 'Item B', 'Item C']);
+
+      // Send Item C again -> it should be moved to top
+      ctrl.updateText('Item C');
+      expect(ctrl.sendCurrentDraft(), isTrue);
+
+      expect(ctrl.historyList.length, 3);
+      expect(ctrl.historyList, equals(['Item C', 'Item A', 'Item B']));
+
+      // Send Item A again -> moved to top
+      ctrl.updateText('Item A');
+      expect(ctrl.sendCurrentDraft(), isTrue);
+
+      expect(ctrl.historyList.length, 3);
+      expect(ctrl.historyList, equals(['Item A', 'Item C', 'Item B']));
+
+      ctrl.dispose();
+    });
+
+    test('history list should enforce maximum capacity of 50 items and drop oldest', () {
+      final ctrl = VocalHomeController(autoInit: false);
+      ctrl.setConnectedForTesting(true);
+
+      // Populate with 50 items: "Item 0" .. "Item 49"
+      final initialHistory = List.generate(50, (i) => 'Item $i');
+      ctrl.setHistoryForTesting(initialHistory);
+      expect(ctrl.historyList.length, 50);
+      expect(ctrl.historyList.first, 'Item 0');
+      expect(ctrl.historyList.last, 'Item 49');
+
+      // Send a new unique item
+      ctrl.updateText('Brand New 51st Item');
+      expect(ctrl.sendCurrentDraft(), isTrue);
+
+      // Max capacity 50 should be strictly preserved
+      expect(ctrl.historyList.length, 50);
+      expect(ctrl.historyList.first, 'Brand New 51st Item');
+      expect(ctrl.historyList[1], 'Item 0');
+      // Oldest item ("Item 49") was dropped
+      expect(ctrl.historyList.contains('Item 49'), isFalse);
+      expect(ctrl.historyList.last, 'Item 48');
+
+      ctrl.dispose();
+    });
+
+    test('clearHistory should empty the historyList and notify listeners', () {
+      final ctrl = VocalHomeController(autoInit: false);
+      ctrl.setHistoryForTesting(['记录 A', '记录 B']);
+      expect(ctrl.historyList.length, 2);
+
+      var notified = false;
+      ctrl.addListener(() => notified = true);
+      ctrl.clearHistory();
+
+      expect(notified, isTrue);
+      expect(ctrl.historyList, isEmpty);
+      ctrl.dispose();
+    });
+
+    test('OCCUPIED error message transitions state to occupied, sets occupied status text, and inhibits auto-reconnect storm', () async {
+      AppStrings.setLocale('zh');
+      final ctrl = VocalHomeController(autoInit: false, enableAutoReconnect: true);
+      expect(ctrl.connectionState, VocalConnectionState.disconnected);
+
+      ctrl.handleIncomingMessageForTesting(
+        '{"type": "error", "code": "OCCUPIED", "message": "Host is occupied by another device"}',
+      );
+
+      expect(ctrl.connectionState, VocalConnectionState.occupied);
+      expect(ctrl.isOccupied, isTrue);
+      expect(ctrl.isConnected, isFalse);
+      expect(ctrl.statusText, AppStrings.current.occupied);
+      expect(ctrl.statusText, '已被占用');
+
+      // Resuming app should not trigger discovery when occupied
+      ctrl.handleAppLifecycleState(AppLifecycleState.resumed);
+      expect(ctrl.connectionState, VocalConnectionState.occupied);
+      expect(ctrl.isOccupied, isTrue);
+
+      // Explicit discoverServices call should be safely blocked to avoid infinite retry storms
+      await ctrl.discoverServices();
+      expect(ctrl.connectionState, VocalConnectionState.occupied);
+      expect(ctrl.isOccupied, isTrue);
+
+      // Test English locale representation
+      AppStrings.setLocale('en');
+      expect(AppStrings.current.occupied, 'Occupied');
+      expect(AppStrings.current.deviceOccupied, 'Device is occupied by another client');
+
+      // Manual retry restores non-occupied state
+      await ctrl.retryConnection();
+      expect(ctrl.isOccupied, isFalse);
+      expect(ctrl.connectionState, isNot(VocalConnectionState.occupied));
+
+      // Reset locale back to zh
+      AppStrings.setLocale('zh');
+      expect(AppStrings.current.occupied, '已被占用');
+      expect(AppStrings.current.deviceOccupied, '设备已被其他设备占用');
+
+      ctrl.dispose();
+    });
+  });
+
+  group('VocalHomeController PIN Authentication & Pairing Tests', () {
+    test('initial auth state should be unauthenticated with no required pin', () {
+      final ctrl = VocalHomeController(autoInit: false);
+      expect(ctrl.isPinRequired, isFalse);
+      expect(ctrl.pinErrorMessage, isNull);
+      expect(ctrl.authToken, isNull);
+      expect(ctrl.pinRemainingAttempts, 3);
+      ctrl.dispose();
+    });
+
+    test('auth_require_pin message should trigger isPinRequired flag', () {
+      final ctrl = VocalHomeController(autoInit: false);
+      expect(ctrl.isPinRequired, isFalse);
+
+      var notified = false;
+      ctrl.addListener(() => notified = true);
+
+      ctrl.handleIncomingMessageForTesting('{"type": "auth_require_pin"}');
+
+      expect(notified, isTrue);
+      expect(ctrl.isPinRequired, isTrue);
+      expect(ctrl.pinErrorMessage, isNull);
+      ctrl.dispose();
+    });
+
+    test('auth_failed message should expose error reason and remaining attempts', () {
+      final ctrl = VocalHomeController(autoInit: false);
+      ctrl.handleIncomingMessageForTesting('{"type": "auth_require_pin"}');
+      expect(ctrl.isPinRequired, isTrue);
+
+      ctrl.handleIncomingMessageForTesting('{"type": "auth_failed", "reason": "PIN 码不正确", "remainingAttempts": 2}');
+      expect(ctrl.isPinRequired, isTrue);
+      expect(ctrl.pinErrorMessage, 'PIN 码不正确');
+      expect(ctrl.pinRemainingAttempts, 2);
+      ctrl.dispose();
+    });
+
+    test('auth_success message should clear pin requirement and store auth token', () {
+      final ctrl = VocalHomeController(autoInit: false);
+      ctrl.handleIncomingMessageForTesting('{"type": "auth_require_pin"}');
+      expect(ctrl.isPinRequired, isTrue);
+
+      ctrl.handleIncomingMessageForTesting('{"type": "auth_success", "token": "token_abc12345"}');
+      expect(ctrl.isPinRequired, isFalse);
+      expect(ctrl.pinErrorMessage, isNull);
+      expect(ctrl.authToken, 'token_abc12345');
+      ctrl.dispose();
+    });
+
+    test('cancelPinVerification should reset auth flags and trigger disconnect', () {
+      final ctrl = VocalHomeController(autoInit: false);
+      ctrl.handleIncomingMessageForTesting('{"type": "auth_require_pin"}');
+      expect(ctrl.isPinRequired, isTrue);
+
+      ctrl.cancelPinVerification();
+      expect(ctrl.isPinRequired, isFalse);
+      expect(ctrl.pinErrorMessage, isNull);
+      expect(ctrl.isConnected, isFalse);
       ctrl.dispose();
     });
   });

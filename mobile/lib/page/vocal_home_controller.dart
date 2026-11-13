@@ -7,6 +7,7 @@ import 'package:speech_to_text/speech_recognition_error.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:nsd/nsd.dart' as nsd;
+import 'package:vocal/i18n/app_strings.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/status.dart' as status;
 
@@ -17,6 +18,7 @@ enum VocalConnectionState {
   connecting,
   connected,
   reconnecting,
+  occupied,
 }
 
 /// Controls all business logic for the Vocal app:
@@ -26,9 +28,24 @@ class VocalHomeController extends ChangeNotifier {
   WebSocketChannel? _channel;
   bool _isConnected = false;
   bool _isConnecting = false;
+  bool _isOccupied = false;
+  String? _lastConnectedWsUrl;
   VocalConnectionState _connectionState = VocalConnectionState.disconnected;
   String _statusText = 'Searching for Mac...';
   DateTime? _lastHeartbeat;
+
+  // ─── PIN & Device Authentication ──────────────────────────
+  String _deviceId = 'device_${DateTime.now().millisecondsSinceEpoch}';
+  String? _authToken;
+  bool _isPinRequired = false;
+  String? _pinErrorMessage;
+  int _pinRemainingAttempts = 3;
+
+  bool get isPinRequired => _isPinRequired;
+  String? get pinErrorMessage => _pinErrorMessage;
+  int get pinRemainingAttempts => _pinRemainingAttempts;
+  String? get authToken => _authToken;
+  String get deviceId => _deviceId;
 
   final Duration heartbeatTimeout;
   final Duration heartbeatCheckInterval;
@@ -40,6 +57,7 @@ class VocalHomeController extends ChangeNotifier {
 
   bool get isConnected => _isConnected;
   bool get isConnecting => _isConnecting;
+  bool get isOccupied => _isOccupied || _connectionState == VocalConnectionState.occupied;
   VocalConnectionState get connectionState => _connectionState;
   String get statusText => _statusText;
   List<nsd.Service> get discoveredServices =>
@@ -112,6 +130,9 @@ class VocalHomeController extends ChangeNotifier {
   /// Guard to prevent engine stop/final callbacks from duplicating text.
   bool _isSessionFinalized = false;
 
+  /// Maximum number of items preserved in send history.
+  static const int maxHistoryLength = 50;
+
   final List<String> _historyList = [];
   bool _wantsListening = false; // User wants continuous listening (manual stop only)
   bool _isStartingSession = false; // Guard against parallel restarts
@@ -169,6 +190,42 @@ class VocalHomeController extends ChangeNotifier {
   /// Clear history list.
   void clearHistory() {
     _historyList.clear();
+    notifyListeners();
+  }
+
+  /// Add history item directly for testing or simulation.
+  @visibleForTesting
+  void addHistoryItemForTesting(String item) {
+    _historyList.remove(item);
+    _historyList.insert(0, item);
+    if (_historyList.length > maxHistoryLength) {
+      _historyList.removeRange(maxHistoryLength, _historyList.length);
+    }
+    notifyListeners();
+  }
+
+  /// Set the entire history list (for testing or restoration).
+  @visibleForTesting
+  void setHistoryForTesting(List<String> history) {
+    _historyList.clear();
+    _historyList.addAll(history);
+    if (_historyList.length > maxHistoryLength) {
+      _historyList.removeRange(maxHistoryLength, _historyList.length);
+    }
+    notifyListeners();
+  }
+
+  bool _isMockConnectedForTesting = false;
+
+  /// Directly set connection status for testing without requiring real WebSocket handshake.
+  @visibleForTesting
+  void setConnectedForTesting(bool connected, {WebSocketChannel? channel}) {
+    _isConnected = connected;
+    _isMockConnectedForTesting = connected;
+    _connectionState = connected ? VocalConnectionState.connected : VocalConnectionState.disconnected;
+    if (channel != null) {
+      _channel = channel;
+    }
     notifyListeners();
   }
 
@@ -347,8 +404,8 @@ class VocalHomeController extends ChangeNotifier {
   // ─── mDNS Discovery ─────────────────────────────────────
 
   Future<void> discoverServices() async {
-    // Guard: skip if already connected, connecting, or discovery in progress
-    if (_isConnected || _isConnecting) return;
+    // Guard: skip if already connected, connecting, occupied, or discovery in progress
+    if (_isConnected || _isConnecting || _isOccupied || _connectionState == VocalConnectionState.occupied) return;
     if (_activeDiscovery != null) return;
 
     try {
@@ -448,6 +505,8 @@ class VocalHomeController extends ChangeNotifier {
       _channel = null;
     }
 
+    _lastConnectedWsUrl = wsUrl;
+    _isOccupied = false;
     _isConnecting = true;
     try {
       debugPrint('Attempting connection to $wsUrl');
@@ -468,13 +527,7 @@ class VocalHomeController extends ChangeNotifier {
 
       channel.stream.listen(
         (message) {
-          final msgStr = message.toString();
-          if (msgStr.contains('"type":"ping"') ||
-              msgStr.contains('"type": "ping"')) {
-            channel.sink.add('{"type": "pong"}');
-            _lastHeartbeat = DateTime.now();
-            debugPrint('Received ping, sent pong.');
-          }
+          _handleIncomingMessage(message.toString());
         },
         onDone: () {
           debugPrint('Connection closed.');
@@ -490,8 +543,10 @@ class VocalHomeController extends ChangeNotifier {
     } catch (e) {
       debugPrint('Connection failed: $e');
       _isConnected = false;
-      _connectionState = VocalConnectionState.disconnected;
-      _statusText = 'Connection failed';
+      if (!_isOccupied && _connectionState != VocalConnectionState.occupied) {
+        _connectionState = VocalConnectionState.disconnected;
+        _statusText = 'Connection failed';
+      }
       _channel = null;
       notifyListeners();
       rethrow;
@@ -513,13 +568,116 @@ class VocalHomeController extends ChangeNotifier {
     }
   }
 
+  void _handleIncomingMessage(String msgStr) {
+    if (msgStr.contains('"type":"ping"') || msgStr.contains('"type": "ping"')) {
+      _channel?.sink.add('{"type": "pong"}');
+      _lastHeartbeat = DateTime.now();
+      debugPrint('Received ping, sent pong.');
+      return;
+    }
+
+    try {
+      final decoded = jsonDecode(msgStr);
+      if (decoded is Map<String, dynamic>) {
+        final type = decoded['type'];
+        if (type == 'error' && decoded['code'] == 'OCCUPIED') {
+          debugPrint('Host is OCCUPIED: ${decoded['message']}');
+          _isOccupied = true;
+          _isConnected = false;
+          _isConnecting = false;
+          _isPinRequired = false;
+          _connectionState = VocalConnectionState.occupied;
+          _statusText = AppStrings.current.occupied;
+          notifyListeners();
+          return;
+        } else if (type == 'auth_require_pin') {
+          _isPinRequired = true;
+          _pinErrorMessage = null;
+          debugPrint('Host requires PIN pairing.');
+          notifyListeners();
+        } else if (type == 'auth_success') {
+          _isPinRequired = false;
+          _pinErrorMessage = null;
+          if (decoded.containsKey('token') && decoded['token'] is String) {
+            _authToken = decoded['token'] as String;
+            debugPrint('Received auth token: $_authToken');
+          }
+          notifyListeners();
+        } else if (type == 'auth_failed') {
+          _pinErrorMessage = decoded['reason'] as String? ?? 'PIN 码错误';
+          _pinRemainingAttempts = decoded['remainingAttempts'] as int? ?? 0;
+          debugPrint('Auth failed: $_pinErrorMessage (remaining: $_pinRemainingAttempts)');
+          notifyListeners();
+        }
+      }
+    } catch (_) {}
+
+    // String fallback for OCCUPIED
+    if (msgStr.contains('"code":"OCCUPIED"') || msgStr.contains('"code": "OCCUPIED"')) {
+      debugPrint('Host is OCCUPIED (fallback)');
+      _isOccupied = true;
+      _isConnected = false;
+      _isConnecting = false;
+      _isPinRequired = false;
+      _connectionState = VocalConnectionState.occupied;
+      _statusText = AppStrings.current.occupied;
+      notifyListeners();
+    }
+  }
+
+  /// Submit 4-digit PIN for device pairing.
+  void verifyPin(String pin) {
+    if (_channel != null && _isConnected) {
+      final payload = jsonEncode({
+        'type': 'auth_verify_pin',
+        'pin': pin.trim(),
+      });
+      _channel!.sink.add(payload);
+      debugPrint('Sent PIN verification: $pin');
+    }
+  }
+
+  /// Dismiss PIN pairing dialog and disconnect.
+  void cancelPinVerification() {
+    _isPinRequired = false;
+    _pinErrorMessage = null;
+    disconnect();
+  }
+
+  void setAuthTokenForTesting(String? token) {
+    _authToken = token;
+  }
+
+  void setDeviceIdForTesting(String id) {
+    _deviceId = id;
+  }
+
+  void handleIncomingMessageForTesting(String message) {
+    _handleIncomingMessage(message);
+  }
+
   void _handleConnectionClosed({Object? error}) {
     if (_isDisposed) return;
+    final wasOccupied = _isOccupied ||
+        _connectionState == VocalConnectionState.occupied ||
+        _channel?.closeCode == 4001;
     _channel = null;
     _isConnected = false;
     _isConnecting = false;
-    _connectionState = VocalConnectionState.disconnected;
+    _isPinRequired = false;
+    _pinErrorMessage = null;
     _lastSentWords = '';
+
+    if (wasOccupied) {
+      _isOccupied = true;
+      _connectionState = VocalConnectionState.occupied;
+      _statusText = AppStrings.current.occupied;
+      debugPrint('Connection closed in occupied state; auto-reconnect suppressed.');
+      notifyListeners();
+      return;
+    }
+
+    _connectionState = VocalConnectionState.disconnected;
     if (enableAutoReconnect) {
       _statusText = 'Disconnected. Searching...';
       notifyListeners();
@@ -538,8 +696,14 @@ class VocalHomeController extends ChangeNotifier {
       _channel = null;
       _isConnected = false;
       _isConnecting = false;
-      _connectionState = VocalConnectionState.disconnected;
       _lastSentWords = '';
+      if (_isOccupied || _connectionState == VocalConnectionState.occupied) {
+        _connectionState = VocalConnectionState.occupied;
+        _statusText = 'Mac 已被占用 (已暂停重连)';
+        notifyListeners();
+        return;
+      }
+      _connectionState = VocalConnectionState.disconnected;
       if (enableAutoReconnect) {
         _statusText = 'Connection Lost';
         notifyListeners();
@@ -553,9 +717,12 @@ class VocalHomeController extends ChangeNotifier {
 
   /// Manually disconnect the current WebSocket connection without triggering auto-reconnect.
   Future<void> disconnect() async {
+    _isOccupied = false;
     stopDiscovery();
     _isConnected = false;
     _isConnecting = false;
+    _isPinRequired = false;
+    _pinErrorMessage = null;
     _connectionState = VocalConnectionState.disconnected;
     _statusText = 'Disconnected';
     _lastSentWords = '';
@@ -566,6 +733,40 @@ class VocalHomeController extends ChangeNotifier {
       _channel = null;
     }
     notifyListeners();
+  }
+
+  /// Explicitly retry connection after being occupied or disconnected.
+  /// Resets occupied state and restarts discovery or reconnects to last host.
+  Future<void> retryConnection() async {
+    debugPrint('User manually triggered retryConnection');
+    _isOccupied = false;
+    stopDiscovery();
+    if (_channel != null) {
+      try {
+        await _channel!.sink.close(status.normalClosure);
+      } catch (_) {}
+      _channel = null;
+    }
+    _isConnected = false;
+    _isConnecting = false;
+    _isPinRequired = false;
+    _pinErrorMessage = null;
+    _connectionState = VocalConnectionState.disconnected;
+    _statusText = 'Reconnecting...';
+    notifyListeners();
+
+    if (_lastConnectedWsUrl != null && _lastConnectedWsUrl!.isNotEmpty) {
+      try {
+        await connectToUrl(_lastConnectedWsUrl!);
+      } catch (e) {
+        debugPrint('Retry direct connection failed: $e');
+        if (!_isOccupied && enableAutoReconnect) {
+          discoverServices();
+        }
+      }
+    } else {
+      discoverServices();
+    }
   }
 
   // ─── Heartbeat ───────────────────────────────────────────
@@ -637,7 +838,7 @@ class VocalHomeController extends ChangeNotifier {
       case AppLifecycleState.resumed:
         // Foreground resume: self-check connection liveness
         debugPrint('App resumed: checking WebSocket connection...');
-        if (!_isConnected && !_isConnecting && enableAutoReconnect) {
+        if (!_isConnected && !_isConnecting && enableAutoReconnect && !_isOccupied && _connectionState != VocalConnectionState.occupied) {
           debugPrint('App resumed and disconnected: restarting discovery...');
           discoverServices();
         }
@@ -662,10 +863,12 @@ class VocalHomeController extends ChangeNotifier {
       await _speechToText.listen(
         onResult: _onSpeechResult,
         localeId: _selectedLocaleId,
-        listenMode: ListenMode.dictation,
+        listenOptions: SpeechListenOptions(
+          listenMode: ListenMode.dictation,
+          cancelOnError: false,
+        ),
         listenFor: const Duration(hours: 1), // Long duration: manual stop only
         pauseFor: const Duration(seconds: 30), // Prevent aggressive auto-pause
-        cancelOnError: false,
       );
     } finally {
       _isStartingSession = false;
@@ -769,6 +972,18 @@ class VocalHomeController extends ChangeNotifier {
     _currentSessionWords = words;
   }
 
+  @visibleForTesting
+  void setOccupiedForTesting({bool occupied = true}) {
+    _isOccupied = occupied;
+    _connectionState = occupied ? VocalConnectionState.occupied : VocalConnectionState.disconnected;
+    if (occupied) {
+      _isConnected = false;
+      _isConnecting = false;
+      _statusText = AppStrings.current.occupied;
+    }
+    notifyListeners();
+  }
+
   // ─── Manual Send to Mac ──────────────────────────────────
 
   /// Manually send the current draft text to the connected Mac host.
@@ -781,7 +996,7 @@ class VocalHomeController extends ChangeNotifier {
       return false;
     }
 
-    if (!_isConnected || _channel == null) {
+    if (!_isConnected || (_channel == null && !_isMockConnectedForTesting)) {
       debugPrint('Cannot send: Mac is not connected.');
       return false;
     }
@@ -796,12 +1011,15 @@ class VocalHomeController extends ChangeNotifier {
       'text': textToSend,
       'pressEnter': _autoPressEnter,
     });
-    _channel!.sink.add(payload);
+    _channel?.sink.add(payload);
     debugPrint('Manually sent to Mac: "$textToSend" (pressEnter: $_autoPressEnter)');
 
     _lastSentWords = textToSend;
-    if (!_historyList.contains(textToSend)) {
-      _historyList.insert(0, textToSend);
+    // Move existing item to top (LRU) or insert fresh item, respecting maxHistoryLength
+    _historyList.remove(textToSend);
+    _historyList.insert(0, textToSend);
+    if (_historyList.length > maxHistoryLength) {
+      _historyList.removeRange(maxHistoryLength, _historyList.length);
     }
 
     // Clear draft after successful transmission

@@ -4,6 +4,7 @@ Corresponds to TC-E2E-03, TC-E2E-07, and TC-E2E-08 in e2e-testing-architecture.m
 """
 
 import asyncio
+import json
 import socket
 import struct
 from typing import Dict, Any
@@ -152,6 +153,98 @@ async def test_concurrent_connection_resilience(port: int = 19303) -> None:
         await harness.stop()
 
 
+async def test_device_occupied_mutex_and_anti_preemption(port: int = 19304) -> None:
+    """TC-E2E-11: Verifies single-device lease mutex, OCCUPIED error payload, and anti-preemption."""
+    print("  [TC-E2E-11] Testing device concurrency mutex and anti-preemption lease...")
+    harness = HostProcessHarness(port=port)
+    client_a = VirtualMobileClient(host="127.0.0.1", port=port)
+    client_b = VirtualMobileClient(host="127.0.0.1", port=port)
+
+    try:
+        await harness.start()
+
+        # 1. Primary Client A connects and becomes active
+        await client_a.connect(timeout=5.0)
+        assert client_a.is_connected, "Client A should be connected"
+
+        state_ev = await harness.wait_for_event(
+            "STATE_CHANGE",
+            predicate=lambda e: e.get("to") == "CONNECTED",
+            timeout=5.0
+        )
+        assert state_ev["to"] == "CONNECTED"
+        print("    ✅ Client A connected: Host state is CONNECTED")
+
+        # 2. Secondary Client B attempts connection while Host is occupied
+        await client_b.connect(timeout=5.0)
+
+        # 3. Host emits CONNECTION_REJECTED event with reason=OCCUPIED
+        reject_ev = await harness.wait_for_event(
+            "CONNECTION_REJECTED",
+            predicate=lambda e: e.get("reason") == "OCCUPIED",
+            timeout=5.0
+        )
+        assert reject_ev is not None, "Host did not emit CONNECTION_REJECTED event"
+        assert reject_ev["reason"] == "OCCUPIED"
+        print("    ✅ Host emitted CONNECTION_REJECTED event (reason=OCCUPIED)")
+
+        # 4. Client B receives OCCUPIED error payload
+        msg = await client_b.recv_text(timeout=5.0)
+        assert msg is not None, "Client B did not receive any payload"
+        data = json.loads(msg)
+        assert data.get("type") == "error", f"Expected type=error, got {data.get('type')}"
+        assert data.get("code") == "OCCUPIED", f"Expected code=OCCUPIED, got {data.get('code')}"
+        assert data.get("message") == "Host is occupied by another device"
+        print(f"    ✅ Client B received OCCUPIED error payload: {data}")
+
+        # 5. Client B connection is disconnected by Host
+        await asyncio.sleep(0.3)
+        try:
+            await client_b.recv_frame(timeout=1.0)
+            assert False, "Client B should have been disconnected by Host"
+        except (ConnectionResetError, asyncio.IncompleteReadError, asyncio.TimeoutError):
+            print("    ✅ Client B safely closed by Host after OCCUPIED payload")
+
+        # 6. Primary Client A still operates normally
+        test_text = "并发互斥测试：Client A 依然正常工作"
+        await client_a.send_json_draft(test_text, press_enter=False)
+        inject_ev = await harness.wait_for_event(
+            "TEXT_INJECTED",
+            predicate=lambda e: e.get("text") == test_text,
+            timeout=5.0
+        )
+        assert inject_ev["text"] == test_text
+        print(f"    ✅ Client A successfully injected text without interruption")
+
+        # 7. Disconnect Client A cleanly
+        await client_a.close(code=1000)
+        disc_ev = await harness.wait_for_event(
+            "STATE_CHANGE",
+            predicate=lambda e: e.get("to") == "DISCONNECTED",
+            timeout=5.0
+        )
+        assert disc_ev["to"] == "DISCONNECTED"
+        print("    ✅ Client A closed, Host transitioned to DISCONNECTED")
+
+        # 8. Client B can now connect normally
+        await client_b.connect(timeout=5.0)
+        reconnect_ev = await harness.wait_for_event(
+            "STATE_CHANGE",
+            predicate=lambda e: e.get("to") == "CONNECTED",
+            timeout=5.0
+        )
+        assert reconnect_ev["to"] == "CONNECTED"
+        print("    ✅ Client B successfully connected after Host released")
+        await client_b.close()
+
+    finally:
+        if client_a.is_connected:
+            await client_a.close()
+        if client_b.is_connected:
+            await client_b.close()
+        await harness.stop()
+
+
 async def run_heartbeat_reconnect_tests(base_port: int = 19300) -> bool:
     """Executes all heartbeat, fault tolerance, and reconnection tests."""
     print("\n▶ Running Heartbeat & Reconnection Self-Healing Tests...")
@@ -159,6 +252,7 @@ async def run_heartbeat_reconnect_tests(base_port: int = 19300) -> bool:
         await test_bidirectional_heartbeat(port=base_port + 1)
         await test_network_fault_and_reconnection_healing(port=base_port + 2)
         await test_concurrent_connection_resilience(port=base_port + 3)
+        await test_device_occupied_mutex_and_anti_preemption(port=base_port + 4)
         print("✅ Heartbeat & Reconnection Self-Healing Tests PASSED\n")
         return True
     except Exception as e:

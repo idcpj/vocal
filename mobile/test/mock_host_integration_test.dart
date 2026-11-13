@@ -7,6 +7,10 @@ import 'package:vocal/page/vocal_home_controller.dart';
 
 /// Lightweight Mock WebSocket Host Server running in-memory on loopback.
 class MockVocalHost {
+  final bool autoAuth;
+  final bool singleDeviceExclusive;
+  MockVocalHost({this.autoAuth = true, this.singleDeviceExclusive = false});
+
   HttpServer? _server;
   WebSocket? _currentSocket;
   final StreamController<String> _messageStreamController =
@@ -23,12 +27,28 @@ class MockVocalHost {
     _server!.listen((HttpRequest request) async {
       if (WebSocketTransformer.isUpgradeRequest(request)) {
         final socket = await WebSocketTransformer.upgrade(request);
+        if (singleDeviceExclusive && _currentSocket != null) {
+          // Reject secondary connection in accordance with protocol
+          socket.add('{"type": "error", "code": "OCCUPIED", "message": "Host is occupied by another device"}');
+          Future.delayed(const Duration(milliseconds: 50), () async {
+            try {
+              await socket.close(4001, 'Host Occupied');
+            } catch (_) {}
+          });
+          return;
+        }
         _currentSocket = socket;
         socket.listen(
           (dynamic data) {
             final msg = data.toString();
             receivedMessages.add(msg);
             _messageStreamController.add(msg);
+            if (autoAuth && msg.contains('"type":"auth_request"')) {
+              try {
+                socket.add('{"type": "auth_success", "mode": "open"}');
+              } catch (_) {}
+              return;
+            }
             if (_waiters.isNotEmpty) {
               final waiter = _waiters.removeAt(0);
               if (!waiter.isCompleted) {
@@ -348,6 +368,84 @@ void main() {
 
       await host.stop();
       ctrl.dispose();
+    });
+
+    test('7. Multi-device anti-preemption: Client B receives OCCUPIED, halts auto-reconnect, while Client A remains undisturbed', () async {
+      final host = MockVocalHost(singleDeviceExclusive: true);
+      await host.start();
+
+      // Client A connects first
+      final ctrlA = VocalHomeController(
+        autoInit: false,
+        enableAutoReconnect: true,
+      );
+      await ctrlA.connectDirect('127.0.0.1', host.port);
+      expect(ctrlA.isConnected, isTrue);
+      expect(ctrlA.connectionState, VocalConnectionState.connected);
+      expect(host.hasActiveClient, isTrue);
+
+      // Client B connects to the same Mock Host
+      final ctrlB = VocalHomeController(
+        autoInit: false,
+        enableAutoReconnect: true, // Auto-reconnect enabled to verify anti-storm circuit breaker!
+      );
+      await ctrlB.connectDirect('127.0.0.1', host.port);
+
+      // Wait briefly for OCCUPIED frame reception and subsequent socket close
+      await Future.delayed(const Duration(milliseconds: 150));
+
+      // 1) Assert Client B enters occupied state
+      expect(ctrlB.connectionState, VocalConnectionState.occupied);
+      expect(ctrlB.isOccupied, isTrue);
+      expect(ctrlB.isConnected, isFalse);
+
+      // 2) Assert Client B halts auto-reconnection and does not storm the host
+      // Wait for an additional period to verify no auto-reconnect occurred
+      await Future.delayed(const Duration(milliseconds: 200));
+      expect(ctrlB.connectionState, VocalConnectionState.occupied);
+      expect(ctrlB.isOccupied, isTrue);
+
+      // 3) Assert Client A remains completely undisturbed and actively connected
+      expect(ctrlA.isConnected, isTrue);
+      expect(ctrlA.connectionState, VocalConnectionState.connected);
+
+      // Client A can still send messages normally
+      ctrlA.updateText('Message from Client A while Client B was rejected');
+      final msgFutureA = host.waitForNextMessage();
+      final sentA = ctrlA.sendCurrentDraft();
+      expect(sentA, isTrue);
+
+      final rawPayloadA = await msgFutureA;
+      final payloadA = jsonDecode(rawPayloadA) as Map<String, dynamic>;
+      expect(payloadA['text'], 'Message from Client A while Client B was rejected');
+
+      // Client A still responds to Ping
+      final pongFuture = host.waitForNextMessage();
+      host.send('{"type": "ping"}');
+      final pongMsg = await pongFuture;
+      expect(pongMsg, '{"type": "pong"}');
+
+      // 4) Test Client B manual retryConnection:
+      // While Client A is still connected, retry should be rejected again and stay occupied
+      await ctrlB.retryConnection();
+      await Future.delayed(const Duration(milliseconds: 150));
+      expect(ctrlB.connectionState, VocalConnectionState.occupied);
+
+      // When Client A disconnects, Client B can successfully reconnect via retryConnection()
+      await ctrlA.disconnect();
+      expect(ctrlA.isConnected, isFalse);
+      await Future.delayed(const Duration(milliseconds: 150));
+      expect(host.hasActiveClient, isFalse);
+
+      await ctrlB.retryConnection();
+      await Future.delayed(const Duration(milliseconds: 150));
+      expect(ctrlB.isConnected, isTrue);
+      expect(ctrlB.connectionState, VocalConnectionState.connected);
+      expect(ctrlB.isOccupied, isFalse);
+
+      await host.stop();
+      ctrlA.dispose();
+      ctrlB.dispose();
     });
   });
 }

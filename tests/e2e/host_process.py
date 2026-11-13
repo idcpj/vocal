@@ -44,10 +44,13 @@ def compile_mac_host() -> str:
 class HostProcessHarness:
     """Spawns VocalHostApp in --test-mode, reads NDJSON stdout events, provides assertion helpers."""
 
-    def __init__(self, port: int = 18888, ping_interval: float = 1.0, mock_inject: bool = True):
+    def __init__(self, port: int = 18888, ping_interval: float = 1.0, mock_inject: bool = True,
+                 require_pin: bool = False, pin_code: Optional[str] = None):
         self.port = port
         self.ping_interval = ping_interval
         self.mock_inject = mock_inject
+        self.require_pin = require_pin
+        self.pin_code = pin_code
         self.proc: Optional[asyncio.subprocess.Process] = None
         self.events: List[Dict[str, Any]] = []
         self._event_waiters: List[Tuple[Callable[[Dict[str, Any]], bool], asyncio.Future]] = []
@@ -65,6 +68,10 @@ class HostProcessHarness:
         ]
         if self.mock_inject:
             args.append("--no-cg-inject")
+        if self.require_pin:
+            args.append("--require-pin")
+        if self.pin_code:
+            args.append(f"--pin={self.pin_code}")
 
         self.proc = await asyncio.create_subprocess_exec(
             *args,

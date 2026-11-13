@@ -26,13 +26,26 @@ class AppStrings {
     notifier.value = AppStrings(languageCode: code.toLowerCase());
   }
 
-  // ─── Header ───────────────────────────────────────────────
+  // ─── Header & Connection Status ───────────────────────────
   String get appName => 'VOCAL';
   String get manualMode => 'MANUAL';
   String get online => 'ONLINE';
   String get offline => 'OFFLINE';
+  String get occupied => isChinese ? '已被占用' : 'Occupied';
   String get macNotConnected => isChinese ? 'Mac 未连接' : 'Mac Disconnected';
+  String get macOccupied => isChinese ? 'Mac 已被占用' : 'Mac Occupied';
+  String get deviceOccupied =>
+      isChinese ? '设备已被其他设备占用' : 'Device is occupied by another client';
   String deviceCount(int count) => isChinese ? '$count 台设备' : '$count devices';
+
+  // ─── Occupied Banner & Protection ──────────────────────────
+  String get hostOccupiedPrompt =>
+      isChinese ? '当前 Mac 已被其他设备占用' : 'Mac is currently occupied by another device';
+  String get hostOccupiedSub =>
+      isChinese ? '防止双端冲突，已进入保护态' : 'Protection active to prevent conflicts';
+  String get retryConnect => isChinese ? '重试连接' : 'Retry Connection';
+  String get occupiedToast =>
+      isChinese ? 'Mac 已被其他设备占用 · 自动重连已暂停' : 'Mac occupied by another device · Auto-reconnect paused';
 
   // ─── History ──────────────────────────────────────────────
   String get historyTitle => isChinese ? '发送历史 (点击快捷填入)' : 'History (Tap to reuse)';
@@ -81,6 +94,16 @@ class AppStrings {
   String get enterMacIpHint => isChinese ? '例如 192.168.1.100' : 'e.g. 192.168.1.100';
   String get port => isChinese ? '端口' : 'Port';
   String get connect => isChinese ? '连接' : 'Connect';
+
+  // ─── PIN Pairing Dialog ───────────────────────────────────
+  String get pinDialogTitle => isChinese ? '设备安全配对' : 'Device Security Pairing';
+  String get pinDialogSub =>
+      isChinese ? '请输入 Mac 菜单栏显示的 4 位 PIN 码' : 'Enter 4-digit PIN shown on Mac menu bar';
+  String get pinInputHint => isChinese ? '4 位数字' : '4 digits';
+  String get confirmPair => isChinese ? '确认配对' : 'Pair';
+  String get pinErrorDefault => isChinese ? 'PIN 码错误，请重试' : 'Incorrect PIN, please retry';
+  String remainingAttempts(int count) =>
+      isChinese ? '剩余 $count 次重试机会' : '$count attempts remaining';
 
   // ─── Locale Selection Sheet ───────────────────────────────
   String get selectSpeechLanguage => isChinese ? '选择识别语言' : 'Speech Recognition Language';
