@@ -3,7 +3,7 @@
 本目录包含 **Vocal** 项目专属的 Agent 团队设定与协同技能体系。
 项目采用 **Hub & Spoke（总控协调 + 垂直领域专家）** 架构：
 - **主 Agent (你 / Coordinator)**：负责接收用户指令、拆解需求、委派任务给具体领域的子 Agent，并在子 Agent 提交成果后担任**审查官 (Reviewer)**，执行最终的代码复核、端到端测试与质量把关。
-- **4 位专业子 Agent**：各自深耕垂直领域，确保单点任务高精度、零违规落地。
+- **5 位专业子 Agent**：各自深耕垂直领域，确保单点任务高精度、零违规落地。
 
 ---
 
@@ -13,6 +13,7 @@
 .agents/
 ├── README.md                          # [本文档] 团队协作总览与规范
 ├── agents/                            # 各垂直领域 Agent 独立设定
+│   ├── ui-ux-designer.md              # 🎨 UI/UX 视觉与原型专家 (pen.dev / vocal.pen / 暗黑科技风)
 │   ├── mac-host-dev.md                # 🍎 macOS 宿主端开发专家 (Swift / Accessibility / NWListener)
 │   ├── flutter-mobile-dev.md          # 📱 Flutter/iOS 移动端开发专家 (Dart / STT / nsd / WebSocket)
 │   ├── system-architect.md            # 📐 系统架构与低延迟通信协议专家
@@ -31,6 +32,7 @@
 
 | Agent 标识 | 角色名 | 核心职责 | 专属文件与工具 | 核心避坑红线 |
 | :--- | :--- | :--- | :--- | :--- |
+| **`ui-ux-designer`** | UI/UX 视觉与组件专家 | `vocal.pen` 画布维护、pen.dev 极简暗黑科技风规范、新功能交互原型、可复用 pen 组件抽象沉淀与多端 UI 同步 | `vocal.pen`、`pencil` MCP 工具链 (`get_app_state`, `execute`, `save`) | 严禁直接文本编辑加密的 `.pen` 文件；必须使用 pencil MCP 工具链增量编辑并 save 保存；发现可复用元素主动抽象为 pen 组件 (`reusable: true`)；遵守 pen.dev schema 约束。 |
 | **`mac-host-dev`** | macOS 宿主专家 | `mac/VocalHostApp.swift`、Network.framework WebSocket Server、Bonjour NetService、Accessibility CGEvent 字符与回车注入、DMG 打包 | `mac/` 目录、`swiftc`、`mac/build_macos.sh` | 保持纯 Swift 零外部依赖；严格处理后台网络线程与主线程注入安全；健全处理 Accessibility 权限缺失。 |
 | **`flutter-mobile-dev`** | Flutter 移动端专家 | `mobile/` 源码、SFSpeechRecognizer 本地语音转录、nsd mDNS 服务扫描、WebSocket 长连接重连与心跳、草稿缓冲与回车控制 | `mobile/lib/`、`fvm flutter`、`mobile/test/` | **iOS 26 真机严禁 Debug 模式**（必须 `--profile` 运行）；恪守“草稿不自动发送”原则；保持 Controller 与 UI 解耦。 |
 | **`system-architect`** | 系统架构与协议专家 | 全链路极低延迟（<50ms）设计、双端通信协议制定、心跳与重连时序图、扩展特性（PIN码/加密）设计 | `communication-protocol.md`、Mermaid 序列图与状态机 | 坚守向后兼容性（Mac 端必须兜底纯文本）；杜绝单向破坏性协议变更。 |
@@ -47,6 +49,7 @@ sequenceDiagram
     actor User as 用户 (User)
     participant Coord as 主 Agent (Coordinator)
     participant Arch as system-architect
+    participant UI as ui-ux-designer
     participant Dev as 开发 Agent (mac / flutter)
     participant CR as code-reviewer
 
@@ -55,8 +58,12 @@ sequenceDiagram
         Coord->>Arch: 委托架构与协议设计
         Arch-->>Coord: 返回规范 Payload 与时序图
     end
+    alt 涉及界面变动或新增 UI
+        Coord->>UI: 委托 UI/UX 原型与画布设计更新
+        UI-->>Coord: 完成 vocal.pen 画布更新并保存 (execute / save)
+    end
 
-    Coord->>Dev: 委派开发任务 (携带角色专属约束 Prompt)
+    Coord->>Dev: 委派开发任务 (参照 UI 画板与协议规范实现)
     Dev-->>Coord: 提交代码修改并完成本地自测 (swiftc / flutter test)
 
     Coord->>CR: 委托进行代码审查与风险排查
