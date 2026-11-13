@@ -32,10 +32,13 @@ fi
 echo "💿 Creating DMG..."
 DMG_STAGING_DIR="${BUILD_DIR}/dmg_staging"
 mkdir -p "${DMG_STAGING_DIR}"
-mv "${APP_BUNDLE}" "${DMG_STAGING_DIR}/"
+cp -R "${APP_BUNDLE}" "${DMG_STAGING_DIR}/"
 ln -s /Applications "${DMG_STAGING_DIR}/Applications"
 
 DMG_PATH="${BUILD_DIR}/${APP_NAME}.dmg"
 hdiutil create -volname "${APP_NAME} Installer" -srcfolder "${DMG_STAGING_DIR}" -ov -format UDZO "${DMG_PATH}"
+rm -rf "${DMG_STAGING_DIR}"
 
-echo "✅ Build complete! DMG available at: ${DMG_PATH}"
+echo "✅ Build complete!"
+echo "   App: ${APP_BUNDLE}"
+echo "   DMG: ${DMG_PATH}"

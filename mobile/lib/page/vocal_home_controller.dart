@@ -8,20 +8,37 @@ import 'package:nsd/nsd.dart' as nsd;
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/status.dart' as status;
 
+/// Connection states of the Vocal mobile client state machine.
+enum VocalConnectionState {
+  disconnected,
+  searching,
+  connecting,
+  connected,
+  reconnecting,
+}
+
 /// Controls all business logic for the Vocal app:
 /// mDNS discovery, WebSocket connection, heartbeat, STT, delta-sync, history.
 class VocalHomeController extends ChangeNotifier {
   // ─── Connection ──────────────────────────────────────────
   WebSocketChannel? _channel;
   bool _isConnected = false;
+  bool _isConnecting = false;
+  VocalConnectionState _connectionState = VocalConnectionState.disconnected;
   String _statusText = 'Searching for Mac...';
   DateTime? _lastHeartbeat;
+
+  final Duration heartbeatTimeout;
+  final Duration heartbeatCheckInterval;
+  final bool enableAutoReconnect;
 
   // ─── Device Discovery ────────────────────────────────────
   final List<nsd.Service> _discoveredServices = [];
   nsd.Discovery? _activeDiscovery;
 
   bool get isConnected => _isConnected;
+  bool get isConnecting => _isConnecting;
+  VocalConnectionState get connectionState => _connectionState;
   String get statusText => _statusText;
   List<nsd.Service> get discoveredServices =>
       List.unmodifiable(_discoveredServices);
@@ -146,7 +163,12 @@ class VocalHomeController extends ChangeNotifier {
 
   // ─── Lifecycle ───────────────────────────────────────────
 
-  VocalHomeController({bool autoInit = true}) {
+  VocalHomeController({
+    bool autoInit = true,
+    this.heartbeatTimeout = const Duration(seconds: 15),
+    this.heartbeatCheckInterval = const Duration(seconds: 5),
+    this.enableAutoReconnect = true,
+  }) {
     if (autoInit) {
       _initSpeech();
       discoverServices();
@@ -163,7 +185,10 @@ class VocalHomeController extends ChangeNotifier {
   @override
   void dispose() {
     _isDisposed = true;
-    _channel?.sink.close(status.goingAway);
+    _isConnecting = false;
+    stopDiscovery();
+    _channel?.sink.close(status.normalClosure);
+    _channel = null;
     super.dispose();
   }
 
@@ -225,18 +250,22 @@ class VocalHomeController extends ChangeNotifier {
   // ─── mDNS Discovery ─────────────────────────────────────
 
   Future<void> discoverServices() async {
-    // Guard: skip if already connected or discovery in progress
-    if (_isConnected) return;
+    // Guard: skip if already connected, connecting, or discovery in progress
+    if (_isConnected || _isConnecting) return;
     if (_activeDiscovery != null) return;
 
     try {
       _discoveredServices.clear();
+      _connectionState = _connectionState == VocalConnectionState.disconnected
+          ? VocalConnectionState.searching
+          : VocalConnectionState.reconnecting;
       _statusText = 'Scanning for Mac...';
       notifyListeners();
 
       final discovery = await nsd.startDiscovery('_vocal._tcp');
       _activeDiscovery = discovery;
       discovery.addListener(() {
+        if (_isDisposed || _activeDiscovery == null) return;
         for (final service in discovery.services) {
           // Skip duplicates (by name)
           if (_discoveredServices.any((s) => s.name == service.name)) continue;
@@ -249,7 +278,7 @@ class VocalHomeController extends ChangeNotifier {
         }
         if (_discoveredServices.isEmpty) {
           _statusText = 'No Mac found yet...';
-        } else if (_discoveredServices.length == 1 && !_isConnected) {
+        } else if (_discoveredServices.length == 1 && !_isConnected && !_isConnecting) {
           // Auto-connect when only one device found
           connectToService(_discoveredServices.first);
           return;
@@ -260,14 +289,19 @@ class VocalHomeController extends ChangeNotifier {
       });
     } catch (e) {
       _statusText = 'Discovery error: $e';
+      _connectionState = VocalConnectionState.disconnected;
       notifyListeners();
     }
   }
 
   /// Connect to a user-selected service from the discovered list.
   void connectToService(nsd.Service service) {
-    // Defer stop so it doesn't fire inside the discovery listener callback
-    Future.microtask(() => stopDiscovery());
+    if (_isConnecting || _isConnected) return;
+    stopDiscovery();
+    _isConnecting = true;
+    _connectionState = VocalConnectionState.connecting;
+    _statusText = 'Connecting to Mac...';
+    notifyListeners();
     _connectToMac(service.host!, service.port!);
   }
 
@@ -286,72 +320,162 @@ class VocalHomeController extends ChangeNotifier {
 
   // ─── WebSocket Connection ────────────────────────────────
 
-  Future<void> _connectToMac(String host, int port) async {
+  /// Connect directly to a specific host and port without mDNS.
+  Future<void> connectDirect(String host, int port) async {
+    await connectToUrl('ws://$host:$port');
+  }
+
+  /// Connect directly to a WebSocket URL.
+  Future<void> connectToUrl(String wsUrl) async {
+    // If currently connected and actively communicating, avoid reconnecting/closing
+    if (_isConnected && _channel != null) {
+      debugPrint('Already connected to Mac, skipping duplicate connectToUrl');
+      return;
+    }
+
+    // If handshake is already in progress with an active channel, ignore concurrent calls
+    if (_isConnecting && _channel != null) {
+      debugPrint('Connection handshake already in progress, ignoring concurrent connectToUrl');
+      return;
+    }
+
+    // If channel exists but not connected (e.g. stale/half-open channel), close cleanly first
+    if (_channel != null) {
+      try {
+        await _channel!.sink.close(status.normalClosure);
+      } catch (_) {}
+      _channel = null;
+    }
+
+    _isConnecting = true;
     try {
-      final wsUrl = 'ws://$host:$port';
       debugPrint('Attempting connection to $wsUrl');
+      _connectionState = VocalConnectionState.connecting;
       _statusText = 'Connecting to Mac...';
       notifyListeners();
 
-      _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
+      final channel = WebSocketChannel.connect(Uri.parse(wsUrl));
+      _channel = channel;
 
-      await _channel!.ready;
+      await channel.ready;
 
-      _channel!.stream.listen(
+      _isConnected = true;
+      _connectionState = VocalConnectionState.connected;
+      _statusText = 'Connected to Mac';
+      _lastHeartbeat = DateTime.now();
+      notifyListeners();
+
+      channel.stream.listen(
         (message) {
-          if (message.toString().contains('"type":"ping"') ||
-              message.toString().contains('"type": "ping"')) {
-            _channel!.sink.add('{"type": "pong"}');
+          final msgStr = message.toString();
+          if (msgStr.contains('"type":"ping"') ||
+              msgStr.contains('"type": "ping"')) {
+            channel.sink.add('{"type": "pong"}');
             _lastHeartbeat = DateTime.now();
             debugPrint('Received ping, sent pong.');
           }
         },
         onDone: () {
           debugPrint('Connection closed.');
-          _isConnected = false;
-          _statusText = 'Disconnected. Searching...';
-          _lastSentWords = '';
-          notifyListeners();
-          discoverServices();
+          _handleConnectionClosed();
         },
         onError: (e) {
           debugPrint('Connection error: $e');
-          _isConnected = false;
-          _lastSentWords = '';
-          notifyListeners();
+          _handleConnectionClosed(error: e);
         },
       );
 
-      _isConnected = true;
-      _statusText = 'Connected to Mac';
-      notifyListeners();
-
       _startHeartbeatCheck();
     } catch (e) {
+      debugPrint('Connection failed: $e');
+      _isConnected = false;
+      _connectionState = VocalConnectionState.disconnected;
       _statusText = 'Connection failed';
+      _channel = null;
+      notifyListeners();
+      rethrow;
+    } finally {
+      _isConnecting = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _connectToMac(String host, int port) async {
+    try {
+      await connectDirect(host, port);
+    } catch (e) {
+      debugPrint('Failed to connect to Mac at $host:$port: $e');
+      // Status text and connectionState have already been updated by connectToUrl
+    } finally {
+      _isConnecting = false;
+      notifyListeners();
+    }
+  }
+
+  void _handleConnectionClosed({Object? error}) {
+    if (_isDisposed) return;
+    _channel = null;
+    _isConnected = false;
+    _isConnecting = false;
+    _connectionState = VocalConnectionState.disconnected;
+    _lastSentWords = '';
+    if (enableAutoReconnect) {
+      _statusText = 'Disconnected. Searching...';
+      notifyListeners();
+      discoverServices();
+    } else {
+      _statusText = 'Disconnected';
       notifyListeners();
     }
   }
 
   void _handleDisconnect() {
     if (_isConnected) {
+      try {
+        _channel?.sink.close(status.normalClosure);
+      } catch (_) {}
+      _channel = null;
       _isConnected = false;
-      _statusText = 'Connection Lost';
-      notifyListeners();
-      discoverServices();
+      _isConnecting = false;
+      _connectionState = VocalConnectionState.disconnected;
+      _lastSentWords = '';
+      if (enableAutoReconnect) {
+        _statusText = 'Connection Lost';
+        notifyListeners();
+        discoverServices();
+      } else {
+        _statusText = 'Connection Lost';
+        notifyListeners();
+      }
     }
+  }
+
+  /// Manually disconnect the current WebSocket connection without triggering auto-reconnect.
+  Future<void> disconnect() async {
+    _isConnected = false;
+    _isConnecting = false;
+    _connectionState = VocalConnectionState.disconnected;
+    _statusText = 'Disconnected';
+    _lastSentWords = '';
+    if (_channel != null) {
+      try {
+        await _channel!.sink.close(status.normalClosure);
+      } catch (_) {}
+      _channel = null;
+    }
+    notifyListeners();
   }
 
   // ─── Heartbeat ───────────────────────────────────────────
 
   void _startHeartbeatCheck() {
     Future.doWhile(() async {
-      await Future.delayed(const Duration(seconds: 10));
-      if (!_isConnected) return false;
+      await Future.delayed(heartbeatCheckInterval);
+      if (!_isConnected || _isDisposed) return false;
 
       final now = DateTime.now();
       if (_lastHeartbeat != null &&
-          now.difference(_lastHeartbeat!).inSeconds > 15) {
+          now.difference(_lastHeartbeat!) > heartbeatTimeout) {
         debugPrint('Heartbeat timeout.');
         _handleDisconnect();
         return false;

@@ -116,5 +116,6 @@ flowchart TD
 
 ## 4. 关键规约参考文档
 - [双端通信与 WebSocket 协议标准规范 (communication-protocol.md)](./references/communication-protocol.md)
+- [跨端自动化集成测试架构规范 (e2e-testing-architecture.md)](./references/e2e-testing-architecture.md)
 - [致命避坑与开发铁律检查清单 (critical-rules.md)](./references/critical-rules.md)
 

@@ -7,10 +7,12 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('VocalHomeController Manual Send & Draft Tests', () {
-    test('initial draft should be empty', () {
+    test('initial draft should be empty and connection flags false', () {
       final ctrl = VocalHomeController(autoInit: false);
       expect(ctrl.textDraft, isEmpty);
       expect(ctrl.historyList, isEmpty);
+      expect(ctrl.isConnecting, isFalse);
+      expect(ctrl.isConnected, isFalse);
       ctrl.dispose();
     });
 
