@@ -13,7 +13,7 @@ class VocalHomeScreen extends StatefulWidget {
 }
 
 class _VocalHomeScreenState extends State<VocalHomeScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final VocalHomeController _ctrl;
   late final AnimationController _animController;
   late final TextEditingController _textController;
@@ -22,6 +22,7 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _ctrl = VocalHomeController();
     _textController = TextEditingController();
     _ctrl.addListener(_onControllerUpdate);
@@ -40,11 +41,28 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
         selection: TextSelection.collapsed(offset: _ctrl.textDraft.length),
       );
     }
+    final errMsg = _ctrl.speechErrorMessage;
+    if (errMsg != null && errMsg.isNotEmpty) {
+      // Non-blocking toast feedback for speech degradation
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _ctrl.speechErrorMessage != null) {
+          _showDarkToast(context, errMsg, isSuccess: false);
+          _ctrl.clearSpeechError();
+        }
+      });
+    }
     setState(() {});
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    _ctrl.handleAppLifecycleState(state);
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _ctrl.removeListener(_onControllerUpdate);
     _ctrl.dispose();
     _animController.dispose();
@@ -528,12 +546,19 @@ class _VocalHomeScreenState extends State<VocalHomeScreen>
     final isListening = _ctrl.isListening;
 
     return GestureDetector(
-      onTap: () {
+      onTap: () async {
         HapticFeedback.mediumImpact();
         if (_ctrl.isListening) {
           _ctrl.stopListening();
         } else {
-          _ctrl.startListening();
+          final started = await _ctrl.startListening();
+          if (!started && mounted) {
+            _showDarkToast(
+              context,
+              _ctrl.speechErrorMessage ?? strings.speechUnavailable,
+              isSuccess: false,
+            );
+          }
         }
       },
       child: AnimatedContainer(

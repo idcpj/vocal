@@ -64,6 +64,8 @@ class _DeviceSelectionPageState extends State<DeviceSelectionPage> {
               Expanded(child: _buildDeviceList()),
               _buildScanStatus(),
               const SizedBox(height: 12),
+              _buildManualConnectButton(),
+              const SizedBox(height: 12),
               _buildCancelButton(),
               const SizedBox(height: 24),
             ],
@@ -233,6 +235,133 @@ class _DeviceSelectionPageState extends State<DeviceSelectionPage> {
         ),
       ],
     );
+  }
+
+  Widget _buildManualConnectButton() {
+    final strings = AppStrings.current;
+    return GestureDetector(
+      onTap: _showManualConnectDialog,
+      child: Container(
+        width: double.infinity,
+        height: 48,
+        decoration: BoxDecoration(
+          color: const Color(0xFF22D3EE).withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFF22D3EE).withValues(alpha: 0.3)),
+        ),
+        alignment: Alignment.center,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.settings_ethernet_rounded, color: Color(0xFF22D3EE), size: 18),
+            const SizedBox(width: 8),
+            Text(
+              strings.manualConnect,
+              style: const TextStyle(
+                color: Color(0xFF22D3EE),
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showManualConnectDialog() {
+    final strings = AppStrings.current;
+    final ipCtrl = TextEditingController();
+    final portCtrl = TextEditingController(text: '8888');
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF0F172A),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+          ),
+          title: Text(
+            strings.manualConnect,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: ipCtrl,
+                autofocus: true,
+                style: const TextStyle(color: Colors.white, fontSize: 14),
+                decoration: InputDecoration(
+                  labelText: strings.enterMacIp,
+                  labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+                  hintText: strings.enterMacIpHint,
+                  hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.25)),
+                  enabledBorder: UnderlineInputBorder(
+                    borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                  ),
+                  focusedBorder: const UnderlineInputBorder(
+                    borderSide: BorderSide(color: Color(0xFF22D3EE)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: portCtrl,
+                keyboardType: TextInputType.number,
+                style: const TextStyle(color: Colors.white, fontSize: 14),
+                decoration: InputDecoration(
+                  labelText: strings.port,
+                  labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+                  enabledBorder: UnderlineInputBorder(
+                    borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                  ),
+                  focusedBorder: const UnderlineInputBorder(
+                    borderSide: BorderSide(color: Color(0xFF22D3EE)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(
+                strings.cancel,
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                final ip = ipCtrl.text.trim();
+                final port = int.tryParse(portCtrl.text.trim()) ?? 8888;
+                if (ip.isNotEmpty) {
+                  Navigator.pop(ctx);
+                  _ctrl.connectDirect(ip, port).catchError((_) {});
+                  Navigator.pop(context);
+                }
+              },
+              child: Text(
+                strings.connect,
+                style: const TextStyle(
+                  color: Color(0xFF22D3EE),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    ).whenComplete(() {
+      ipCtrl.dispose();
+      portCtrl.dispose();
+    });
   }
 
   Widget _buildCancelButton() {

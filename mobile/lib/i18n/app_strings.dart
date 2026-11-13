@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/foundation.dart';
 
 /// Lightweight i18n support for Vocal App (English & Simplified Chinese).
@@ -58,10 +57,15 @@ class AppStrings {
   String get dismissKeyboard => isChinese ? '收起键盘' : 'Dismiss Keyboard';
   String get send => isChinese ? '发送' : 'Send';
 
-  // ─── Toast Feedback ───────────────────────────────────────
+  // ─── Toast Feedback & Speech Status ───────────────────────
   String get sentWithEnter => isChinese ? '已发送 (已自动触发回车)' : 'Sent (Return simulated)';
   String get sent => isChinese ? '已发送' : 'Sent';
   String get connectFirst => isChinese ? '请先连接局域网内的 Mac 主机' : 'Please connect to a Mac host first';
+  String get speechUnavailable =>
+      isChinese ? '未检测到系统语音服务，可直接打字输入' : 'Speech service unavailable, please type';
+  String get speechNetworkError =>
+      isChinese ? '语音识别网络异常，请检查网络或离线语言包' : 'Speech network error, check network or offline pack';
+  String get micOccupied => isChinese ? '麦克风被其他应用占用' : 'Microphone is occupied by another app';
 
   // ─── Device Selection Page ────────────────────────────────
   String get selectDevice => isChinese ? '选择设备' : 'Select Device';
@@ -72,6 +76,11 @@ class AppStrings {
   String get scanning => isChinese ? '正在扫描...' : 'Scanning...';
   String get cancel => isChinese ? '取消' : 'Cancel';
   String get unknownDevice => isChinese ? '未知设备' : 'Unknown Device';
+  String get manualConnect => isChinese ? '手动输入 IP 连接' : 'Manual IP Connect';
+  String get enterMacIp => isChinese ? '输入 Mac 局域网 IP' : 'Enter Mac IP';
+  String get enterMacIpHint => isChinese ? '例如 192.168.1.100' : 'e.g. 192.168.1.100';
+  String get port => isChinese ? '端口' : 'Port';
+  String get connect => isChinese ? '连接' : 'Connect';
 
   // ─── Locale Selection Sheet ───────────────────────────────
   String get selectSpeechLanguage => isChinese ? '选择识别语言' : 'Speech Recognition Language';

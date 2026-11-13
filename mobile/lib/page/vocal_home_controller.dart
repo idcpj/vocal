@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' show AppLifecycleState;
 
 import 'package:flutter/foundation.dart';
+import 'package:speech_to_text/speech_recognition_error.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:nsd/nsd.dart' as nsd;
@@ -45,10 +47,21 @@ class VocalHomeController extends ChangeNotifier {
 
   // ─── Speech-to-Text & Locales ────────────────────────────
   final SpeechToText _speechToText = SpeechToText();
+  bool _isSpeechAvailable = false;
+  String? _speechErrorMessage;
   List<LocaleName> _availableLocales = [];
   String? _selectedLocaleId;
   String _lastWords = '';
   String _lastSentWords = '';
+
+  bool get isSpeechAvailable => _isSpeechAvailable;
+  String? get speechErrorMessage => _speechErrorMessage;
+
+  /// Clear any active speech error message
+  void clearSpeechError() {
+    _speechErrorMessage = null;
+    notifyListeners();
+  }
 
   List<LocaleName> get availableLocales => List.unmodifiable(_availableLocales);
   String? get selectedLocaleId => _selectedLocaleId;
@@ -192,58 +205,142 @@ class VocalHomeController extends ChangeNotifier {
     super.dispose();
   }
 
-  // ─── Speech Init ─────────────────────────────────────────
+  // ─── Speech Init & Callbacks ─────────────────────────────
 
-  Future<void> _initSpeech() async {
-    bool available = await _speechToText.initialize(
-      onStatus: (status) {
-        debugPrint('STT Status: $status');
-        // Safety net: if engine stops unexpectedly while user still wants listening
-        if (status == 'done' && _wantsListening) {
-          Future.delayed(const Duration(milliseconds: 100), () {
-            if (_wantsListening &&
-                !_speechToText.isListening &&
-                !_isStartingSession) {
-              debugPrint('Engine stopped, restarting cleanly...');
-              _beginListenSession();
-            }
-          });
+  Future<bool> _initSpeech() async {
+    try {
+      final available = await _speechToText.initialize(
+        onStatus: _onSpeechStatus,
+        onError: _onSpeechError,
+      );
+      _isSpeechAvailable = available;
+      if (!available) {
+        _speechErrorMessage = '未检测到系统语音识别服务';
+        debugPrint('STT init: Speech recognition not available on this device');
+      } else {
+        _speechErrorMessage = null;
+        var locales = await _speechToText.locales();
+        if (locales.isEmpty) {
+          locales = [
+            LocaleName('zh_CN', '中文 (中国)'),
+            LocaleName('en_US', 'English (United States)'),
+          ];
         }
-      },
-      onError: (error) {
-        debugPrint('STT Error: $error');
-      },
-    );
-    if (available) {
-      final locales = await _speechToText.locales();
-      _availableLocales = locales;
+        _availableLocales = locales;
+        _selectDefaultLocale(locales);
+      }
+      notifyListeners();
+      return available;
+    } catch (e) {
+      _isSpeechAvailable = false;
+      _speechErrorMessage = '语音服务初始化异常: $e';
+      debugPrint('STT init error: $e');
+      notifyListeners();
+      return false;
+    }
+  }
 
-      // Smart default: prioritize Mandarin Chinese (zh_CN), fallback to any zh, or first locale
-      LocaleName? preferred;
+  void _selectDefaultLocale(List<LocaleName> locales) {
+    if (locales.isEmpty) return;
+    LocaleName? preferred;
+    for (var locale in locales) {
+      final id = locale.localeId.toLowerCase().replaceAll('-', '_');
+      if (id.contains('zh_cn') || id.contains('zh_hans')) {
+        preferred = locale;
+        break;
+      }
+    }
+    if (preferred == null) {
       for (var locale in locales) {
-        final id = locale.localeId.toLowerCase().replaceAll('-', '_');
-        if (id.contains('zh_cn') || id.contains('zh_hans')) {
+        if (locale.localeId.toLowerCase().startsWith('zh')) {
           preferred = locale;
           break;
         }
       }
-      if (preferred == null) {
-        for (var locale in locales) {
-          if (locale.localeId.toLowerCase().startsWith('zh')) {
-            preferred = locale;
-            break;
-          }
-        }
-      }
-      if (preferred == null && locales.isNotEmpty) {
-        preferred = locales.first;
-      }
+    }
+    preferred ??= locales.first;
 
-      if (preferred != null) {
-        _selectedLocaleId = preferred.localeId;
-        debugPrint('STT Locale initialized to: ${preferred.name} (${preferred.localeId})');
+    _selectedLocaleId = preferred.localeId;
+    debugPrint('STT Locale initialized to: ${preferred.name} (${preferred.localeId})');
+  }
+
+  void _onSpeechStatus(String status) {
+    debugPrint('STT Status: $status');
+    // Safety net & Android continuous dictation: if engine stops while user still wants listening
+    if (status == 'done' && _wantsListening) {
+      if (_currentSessionWords.trim().isNotEmpty) {
+        _sessionBaseText = _textDraft;
+        _currentSessionWords = '';
+      }
+      Future.delayed(const Duration(milliseconds: 150), () {
+        if (_wantsListening &&
+            !_speechToText.isListening &&
+            !_isStartingSession) {
+          debugPrint('Android STT: Smooth session auto-restart...');
+          _beginListenSession();
+        }
+      });
+    }
+    notifyListeners();
+  }
+
+  void _onSpeechError(SpeechRecognitionError error) {
+    final msg = error.errorMsg;
+    debugPrint('STT Error: $msg (permanent: ${error.permanent})');
+
+    // 1. Android typical silence & pause timeouts (Benign, smooth restart)
+    if (msg == 'error_speech_timeout' || msg == 'error_no_match') {
+      debugPrint('STT benign timeout/no-match, keeping session alive...');
+      if (_currentSessionWords.trim().isNotEmpty) {
+        _sessionBaseText = _textDraft;
+        _currentSessionWords = '';
+      }
+      if (_wantsListening) {
+        Future.delayed(const Duration(milliseconds: 150), () {
+          if (_wantsListening &&
+              !_speechToText.isListening &&
+              !_isStartingSession) {
+            debugPrint('STT: Resuming after timeout/no-match...');
+            _beginListenSession();
+          }
+        });
+      }
+      return;
+    }
+
+    // 2. Network error (Google Speech cloud unreachable / needs offline package)
+    if (msg == 'error_network' || msg == 'error_network_timeout') {
+      _speechErrorMessage = '语音识别网络异常，请检查网络或配置离线语言包';
+      _finalizeLocalSpeech();
+      notifyListeners();
+      return;
+    }
+
+    // 3. Audio hardware occupied
+    if (msg == 'error_audio_error') {
+      _speechErrorMessage = '麦克风被其他应用占用';
+      _finalizeLocalSpeech();
+      notifyListeners();
+      return;
+    }
+
+    // 4. Engine busy / client error
+    if (msg == 'error_busy' || msg == 'error_client') {
+      if (_wantsListening) {
+        Future.delayed(const Duration(milliseconds: 200), () {
+          if (_wantsListening &&
+              !_speechToText.isListening &&
+              !_isStartingSession) {
+            _beginListenSession();
+          }
+        });
+        return;
       }
     }
+
+    // Other permanent / fatal errors
+    _speechErrorMessage = '语音识别异常: $msg';
+    _finalizeLocalSpeech();
     notifyListeners();
   }
 
@@ -288,6 +385,7 @@ class VocalHomeController extends ChangeNotifier {
         notifyListeners();
       });
     } catch (e) {
+      stopDiscovery();
       _statusText = 'Discovery error: $e';
       _connectionState = VocalConnectionState.disconnected;
       notifyListeners();
@@ -327,6 +425,9 @@ class VocalHomeController extends ChangeNotifier {
 
   /// Connect directly to a WebSocket URL.
   Future<void> connectToUrl(String wsUrl) async {
+    // Release active discovery and its MulticastLock when connecting
+    stopDiscovery();
+
     // If currently connected and actively communicating, avoid reconnecting/closing
     if (_isConnected && _channel != null) {
       debugPrint('Already connected to Mac, skipping duplicate connectToUrl');
@@ -452,6 +553,7 @@ class VocalHomeController extends ChangeNotifier {
 
   /// Manually disconnect the current WebSocket connection without triggering auto-reconnect.
   Future<void> disconnect() async {
+    stopDiscovery();
     _isConnected = false;
     _isConnecting = false;
     _connectionState = VocalConnectionState.disconnected;
@@ -486,19 +588,64 @@ class VocalHomeController extends ChangeNotifier {
 
   // ─── Listening (STT) ────────────────────────────────────
 
-  Future<void> startListening() async {
+  Future<bool> startListening() async {
+    // If engine was not available, try initializing once more
+    if (!_isSpeechAvailable) {
+      final initialized = await _initSpeech();
+      if (!initialized) {
+        _speechErrorMessage = '未检测到系统语音识别服务，可直接打字输入';
+        notifyListeners();
+        return false;
+      }
+    }
+
+    _speechErrorMessage = null;
     _sessionBaseText = _textDraft;
     _currentSessionWords = '';
     _isSessionFinalized = false;
     _wantsListening = true;
     notifyListeners();
     await _beginListenSession();
+    return true;
   }
 
   /// Manually stop listening (manual stop only, no automatic cutoff)
   Future<void> stopListening() async {
     _wantsListening = false;
     _finalizeLocalSpeech();
+  }
+
+  // ─── App Lifecycle ───────────────────────────────────────
+
+  /// Handle Flutter App lifecycle changes (e.g. backgrounding / foregrounding).
+  /// Protects microphone when going background, auto-recovers connection on resume.
+  void handleAppLifecycleState(AppLifecycleState state) {
+    if (_isDisposed) return;
+    debugPrint('VocalHomeController: lifecycle state changed to $state');
+
+    switch (state) {
+      case AppLifecycleState.paused:
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.hidden:
+        // Protect microphone in background, preserve draft intact
+        if (_wantsListening || _speechToText.isListening) {
+          debugPrint('App backgrounded: safely stopping speech to release microphone...');
+          stopListening();
+        }
+        break;
+
+      case AppLifecycleState.resumed:
+        // Foreground resume: self-check connection liveness
+        debugPrint('App resumed: checking WebSocket connection...');
+        if (!_isConnected && !_isConnecting && enableAutoReconnect) {
+          debugPrint('App resumed and disconnected: restarting discovery...');
+          discoverServices();
+        }
+        break;
+
+      case AppLifecycleState.detached:
+        break;
+    }
   }
 
   /// Internal: start a single STT listen session.
@@ -593,6 +740,33 @@ class VocalHomeController extends ChangeNotifier {
     _sessionBaseText = text;
     _textDraft = text;
     _isSessionFinalized = false;
+  }
+
+  @visibleForTesting
+  void setSpeechAvailableForTesting(bool available, {String? errorMessage}) {
+    _isSpeechAvailable = available;
+    _speechErrorMessage = errorMessage;
+    notifyListeners();
+  }
+
+  @visibleForTesting
+  void handleSpeechErrorForTesting(SpeechRecognitionError error) {
+    _onSpeechError(error);
+  }
+
+  @visibleForTesting
+  void handleSpeechStatusForTesting(String status) {
+    _onSpeechStatus(status);
+  }
+
+  @visibleForTesting
+  void setWantsListeningForTesting(bool value) {
+    _wantsListening = value;
+  }
+
+  @visibleForTesting
+  void setCurrentSessionWordsForTesting(String words) {
+    _currentSessionWords = words;
   }
 
   // ─── Manual Send to Mac ──────────────────────────────────

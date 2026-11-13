@@ -74,6 +74,7 @@ sequenceDiagram
 ## 5. 项目参考规范索引
 
 - **双端通信与 WebSocket 协议唯一真实源**: [communication-protocol.md](.agents/skills/vocal-agents/references/communication-protocol.md)
+- **Android 客户端适配与架构落地规范**: [android-architecture-spec.md](.agents/skills/vocal-agents/references/android-architecture-spec.md)
 - **跨端自动化集成测试架构规范**: [e2e-testing-architecture.md](.agents/skills/vocal-agents/references/e2e-testing-architecture.md)
 - **致命避坑与开发铁律清单**: [critical-rules.md](.agents/skills/vocal-agents/references/critical-rules.md)
 - **多 Agent 调度编排技能**: [SKILL.md](.agents/skills/vocal-agents/SKILL.md)

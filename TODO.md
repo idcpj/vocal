@@ -27,11 +27,11 @@
   - [ ] 焦点字符注入：调用 Windows 底层 `SendInput` API，精准将接收到的文本与回车无缝输入到当前焦点窗口
   - [ ] Windows 托盘生态：实现系统托盘常驻图标 (System Tray)、连接状态指示灯、右键菜单与设置面板
 
-- [ ] **Android 客户端适配与测试 (Android Mobile Support)**
-  - [ ] 基于现有 Flutter 架构适配 Android 端权限（麦克风录音、局域网多播 `CHANGE_WIFI_MULTICAST_STATE`）
-  - [ ] 语音识别层调优：适配 Android 原生语音听写引擎（处理 Google 语音识别服务依赖、离线语音模型与错误容灾）
-  - [ ] 局域网服务发现兼容：处理 Android 系统下的 NSD 多播锁 (MulticastLock) 机制，确保快速发现局域网宿主
-  - [ ] 使用本地 Android Studio 模拟器/真机环境，完成编译、全链路功能自测与打包验证
+- [x] **Android 客户端适配与测试 (Android Mobile Support)**
+  - [x] 基于现有 Flutter 架构适配 Android 端权限（麦克风录音、局域网多播 `CHANGE_WIFI_MULTICAST_STATE`）
+  - [x] 语音识别层调优：适配 Android 原生语音听写引擎（处理 Google 语音识别服务依赖、离线语音模型与错误容灾）
+  - [x] 局域网服务发现兼容：处理 Android 系统下的 NSD 多播锁 (MulticastLock) 机制，确保快速发现局域网宿主
+  - [x] 使用本地 Android Studio 模拟器/真机环境，完成编译、全链路功能自测与打包验证
 
 - [ ] **全新趣味现代化产品官网 (Modern & Interactive Landing Page)**
   - [ ] 现代化视觉重塑：采用极简科技暗黑风、流畅平滑滚动与声波/流体动效

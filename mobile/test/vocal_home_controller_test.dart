@@ -1,4 +1,6 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:speech_to_text/speech_recognition_error.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:vocal/page/vocal_home_controller.dart';
@@ -111,6 +113,125 @@ void main() {
       ctrl.setLocale('ja_JP');
       expect(ctrl.selectedLocaleId, 'ja_JP');
       expect(ctrl.currentLocaleDisplayName, 'Japanese (Japan)');
+
+      ctrl.dispose();
+    });
+
+    test('empty locales should fallback to default Chinese and English', () {
+      final ctrl = VocalHomeController(autoInit: false);
+      ctrl.setAvailableLocalesForTesting([], defaultLocaleId: null);
+
+      // Even if raw list is empty, default display name gracefully handles it
+      expect(ctrl.currentLocaleDisplayName, '中文 (普通话)');
+      ctrl.dispose();
+    });
+  });
+
+  group('Android STT Error Recovery & Continuous Dictation Tests', () {
+    test('benign timeouts (error_speech_timeout & error_no_match) should preserve draft and listening intent', () {
+      final ctrl = VocalHomeController(autoInit: false);
+      ctrl.setSessionBaseTextForTesting('基准文字');
+      ctrl.setCurrentSessionWordsForTesting('正在说的话');
+      ctrl.updateText('基准文字正在说的话');
+      ctrl.setWantsListeningForTesting(true);
+
+      // Simulate Android pause error: error_speech_timeout
+      final timeoutErr = SpeechRecognitionError('error_speech_timeout', false);
+      ctrl.handleSpeechErrorForTesting(timeoutErr);
+
+      // Listening intent MUST remain true!
+      expect(ctrl.isListening, isTrue);
+      // Draft MUST NOT be cleared!
+      expect(ctrl.textDraft, '基准文字正在说的话');
+      // No scary error message presented to user
+      expect(ctrl.speechErrorMessage, isNull);
+
+      // Simulate Android no match error: error_no_match
+      final noMatchErr = SpeechRecognitionError('error_no_match', false);
+      ctrl.handleSpeechErrorForTesting(noMatchErr);
+
+      expect(ctrl.isListening, isTrue);
+      expect(ctrl.textDraft, '基准文字正在说的话');
+      expect(ctrl.speechErrorMessage, isNull);
+
+      ctrl.dispose();
+    });
+
+    test('network errors (error_network) should show friendly message and preserve draft', () {
+      final ctrl = VocalHomeController(autoInit: false);
+      ctrl.setSessionBaseTextForTesting('网络断开前的内容');
+      ctrl.setWantsListeningForTesting(true);
+
+      final netErr = SpeechRecognitionError('error_network', false);
+      ctrl.handleSpeechErrorForTesting(netErr);
+
+      expect(ctrl.speechErrorMessage, contains('网络异常'));
+      expect(ctrl.textDraft, '网络断开前的内容');
+      expect(ctrl.isListening, isFalse);
+
+      ctrl.clearSpeechError();
+      expect(ctrl.speechErrorMessage, isNull);
+
+      ctrl.dispose();
+    });
+
+    test('audio contention (error_audio_error) should show mic occupied message and preserve draft', () {
+      final ctrl = VocalHomeController(autoInit: false);
+      ctrl.setSessionBaseTextForTesting('录音被占用前的内容');
+      ctrl.setWantsListeningForTesting(true);
+
+      final audioErr = SpeechRecognitionError('error_audio_error', false);
+      ctrl.handleSpeechErrorForTesting(audioErr);
+
+      expect(ctrl.speechErrorMessage, contains('麦克风被其他应用占用'));
+      expect(ctrl.textDraft, '录音被占用前的内容');
+      expect(ctrl.isListening, isFalse);
+
+      ctrl.dispose();
+    });
+
+    test('speech unavailable state gracefully blocks listening and provides clear prompt', () async {
+      final ctrl = VocalHomeController(autoInit: false);
+      ctrl.setSpeechAvailableForTesting(false, errorMessage: '未检测到系统语音识别服务');
+      expect(ctrl.isSpeechAvailable, isFalse);
+      expect(ctrl.speechErrorMessage, '未检测到系统语音识别服务');
+
+      // Draft typing is unaffected
+      ctrl.updateText('手写文字不受影响');
+      expect(ctrl.textDraft, '手写文字不受影响');
+
+      ctrl.dispose();
+    });
+  });
+
+  group('VocalHomeController App Lifecycle Tests', () {
+    test('backgrounding app (paused/inactive/hidden) must stop listening to release mic and keep draft', () {
+      final ctrl = VocalHomeController(autoInit: false);
+      ctrl.setSessionBaseTextForTesting('录制中切换到微信');
+      ctrl.setWantsListeningForTesting(true);
+      expect(ctrl.isListening, isTrue);
+
+      // App backgrounded
+      ctrl.handleAppLifecycleState(AppLifecycleState.paused);
+
+      // Microphone MUST be safely released
+      expect(ctrl.isListening, isFalse);
+      // Draft MUST be completely preserved
+      expect(ctrl.textDraft, '录制中切换到微信');
+
+      ctrl.dispose();
+    });
+
+    test('resuming app (resumed) should auto-trigger service discovery when disconnected', () {
+      final ctrl = VocalHomeController(autoInit: false, enableAutoReconnect: true);
+      expect(ctrl.isConnected, isFalse);
+      expect(ctrl.connectionState, VocalConnectionState.disconnected);
+
+      // App resumed back from background
+      ctrl.handleAppLifecycleState(AppLifecycleState.resumed);
+
+      // Should automatically transition to searching
+      expect(ctrl.connectionState, VocalConnectionState.searching);
 
       ctrl.dispose();
     });
