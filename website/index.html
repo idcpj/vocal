@@ -3,118 +3,577 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Vocal 🎙️ - 基于 iPhone 的 Mac 高速语音录入键盘</title>
-  <meta name="description" content="Vocal 将您的 iPhone 转换为专业的远程语音输入设备。利用 Apple 原生语音听写与极低延迟 WebSocket，在手机端审阅编辑并一键将文字丝滑注入任意 Mac 焦点应用。">
-  <meta name="keywords" content="Vocal, 语音输入, Mac键盘, iPhone语音, SFSpeechRecognizer, WebSocket, 开源软件, 低延迟语音">
+  <title>Vocal 🎙️ - 基于手机的电脑极速语音录入键盘 | iOS · Android · macOS · Windows</title>
+  <meta name="description" content="Vocal 将您的手机（iPhone / Android）转换为电脑（Mac / Windows）的专业无线语音录入键盘。基于原生听写引擎与局域网超低延迟 WebSocket，毫秒级注入字符，告别打字疲劳。">
+  <meta name="keywords" content="Vocal, 语音输入, 语音打字, Mac键盘, Windows语音输入, iPhone语音听写, Android语音, 低延迟, WebSocket, SFSpeechRecognizer, 开源软件">
   <link rel="icon" type="image/png" href="images/logo.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-  <!-- Navigation -->
+  <!-- Ambient Light Orbs & Grid Background -->
+  <div class="ambient-glow orb-1"></div>
+  <div class="ambient-glow orb-2"></div>
+  <div class="ambient-glow orb-3"></div>
+  <div class="cyber-grid"></div>
+  <div class="cursor-glow" id="cursor-glow"></div>
+
+  <!-- Scroll Progress Indicator -->
+  <div class="scroll-progress-bar" id="scroll-progress"></div>
+
+  <!-- Navigation Bar -->
   <nav class="navbar" id="navbar">
     <div class="nav-container">
       <a href="#" class="nav-logo">
-        <img src="images/logo.png" alt="Vocal Logo" class="logo-img">
-        <span class="logo-text">VOCAL</span>
-        <span class="badge-version">v1.0.0</span>
+        <div class="logo-wrapper">
+          <img src="images/logo.png" alt="Vocal Logo" class="logo-img">
+          <div class="logo-ring"></div>
+        </div>
+        <div class="logo-title-group">
+          <span class="logo-text">VOCAL</span>
+          <span class="logo-subtext">SPEECH KEYBOARD</span>
+        </div>
+        <span class="badge-version">v1.2.0</span>
       </a>
 
+      <!-- Desktop Navigation Links -->
       <ul class="nav-links">
-        <li><a href="#showcase" class="nav-link">界面预览</a></li>
-        <li><a href="#features" class="nav-link">核心特性</a></li>
-        <li><a href="#architecture" class="nav-link">工作原理</a></li>
-        <li><a href="#download" class="nav-link">快速安装</a></li>
-        <li><a href="#faq" class="nav-link">常见问题</a></li>
+        <li><a href="#playground" class="nav-link"><span class="nav-icon">✨</span>趣味试玩</a></li>
+        <li><a href="#platforms" class="nav-link"><span class="nav-icon">💻</span>全端生态</a></li>
+        <li><a href="#showcase" class="nav-link"><span class="nav-icon">📱</span>界面预览</a></li>
+        <li><a href="#features" class="nav-link"><span class="nav-icon">⚡</span>核心特性</a></li>
+        <li><a href="#architecture" class="nav-link"><span class="nav-icon">🔄</span>工作原理</a></li>
+        <li><a href="#security" class="nav-link"><span class="nav-icon">🛡️</span>隐私安全</a></li>
+        <li><a href="#download" class="nav-link"><span class="nav-icon">📥</span>下载安装</a></li>
+        <li><a href="#faq" class="nav-link"><span class="nav-icon">❓</span>FAQ</a></li>
       </ul>
 
+      <!-- Action Buttons -->
       <div class="nav-actions">
-        <a href="https://github.com/idcpj/vocal" target="_blank" class="btn btn-secondary btn-sm" id="github-star-btn">
+        <a href="https://github.com/idcpj/vocal" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" id="github-star-btn">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
           </svg>
-          GitHub
+          <span>Star 1.2k</span>
         </a>
-        <a href="#download" class="btn btn-primary btn-sm" id="nav-download-btn">下载 DMG</a>
+        <a href="#download" class="btn btn-primary btn-sm glow-btn" id="nav-download-btn">
+          <span>立即获取</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        </a>
+        <button class="mobile-menu-toggle" id="menu-toggle" aria-label="切换菜单">
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Mobile Drawer Navigation -->
+    <div class="mobile-drawer" id="mobile-drawer">
+      <ul class="mobile-nav-links">
+        <li><a href="#playground" class="mobile-nav-link">✨ 趣味试玩演示器</a></li>
+        <li><a href="#platforms" class="mobile-nav-link">💻 四端矩阵生态</a></li>
+        <li><a href="#showcase" class="mobile-nav-link">📱 双端协同截图</a></li>
+        <li><a href="#features" class="mobile-nav-link">⚡ 核心技术特性</a></li>
+        <li><a href="#architecture" class="mobile-nav-link">🔄 工作原理与协议</a></li>
+        <li><a href="#security" class="mobile-nav-link">🛡️ 局域网隐私安全</a></li>
+        <li><a href="#download" class="mobile-nav-link">📥 客户端与安装包</a></li>
+        <li><a href="#faq" class="mobile-nav-link">❓ 常见问题答疑</a></li>
+      </ul>
+      <div class="mobile-drawer-actions">
+        <a href="#download" class="btn btn-primary btn-block">快速下载安装包</a>
       </div>
     </div>
   </nav>
 
   <!-- Hero Section -->
   <header class="hero-section">
-    <div class="hero-pill">
-      <span>🎙️</span>
-      <span>基于 iPhone 的 Mac 高速语音录入键盘</span>
+    <div class="hero-content">
+      <div class="hero-pill-tag">
+        <span class="pulsing-radar-dot"></span>
+        <span class="hero-pill-text">全平台生态矩阵 · iOS · Android · macOS · Windows</span>
+        <span class="hero-pill-arrow">→</span>
+      </div>
+
+      <h1 class="hero-title">
+        把手机变成电脑的<br>
+        <span class="gradient-text glow-text">无线超低延迟语音键盘</span>
+      </h1>
+
+      <p class="hero-desc">
+        告别长时间敲击键盘的手腕酸痛与疲劳。借助手机端原生神经网络降噪听写，与局域网极速 WebSocket 双向长连接，在手机上随心说、随时校对，一键将文字毫秒级注入 Mac 与 Windows 任意光标窗口。
+      </p>
+
+      <div class="hero-ctas">
+        <a href="#playground" class="btn btn-primary btn-lg glow-btn" id="hero-try-btn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+          <span>立即试玩实时演示</span>
+        </a>
+        <a href="#download" class="btn btn-secondary btn-lg" id="hero-download-btn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          <span>获取各端安装包</span>
+        </a>
+      </div>
+
+      <!-- Hero Tech Highlights -->
+      <div class="hero-badges">
+        <div class="hero-badge-item">
+          <div class="badge-icon green"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="badge-text">
+            <strong>&lt; 15ms</strong>
+            <span>极低局域网延迟</span>
+          </div>
+        </div>
+        <div class="hero-badge-item">
+          <div class="badge-icon blue"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="badge-text">
+            <strong>100% 本地闭环</strong>
+            <span>零云端上传隐私保护</span>
+          </div>
+        </div>
+        <div class="hero-badge-item">
+          <div class="badge-icon purple"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="badge-text">
+            <strong>全应用光标适配</strong>
+            <span>VS Code / 微信 / 备忘录</span>
+          </div>
+        </div>
+        <div class="hero-badge-item">
+          <div class="badge-icon cyan"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="badge-text">
+            <strong>mDNS 零配置</strong>
+            <span>秒级自动广播与建连</span>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <h1 class="hero-title">
-      把 iPhone 变成 Mac 的<br>
-      <span class="gradient-text">无线超低延迟听写键盘</span>
-    </h1>
-
-    <p class="hero-desc">
-      告别双手敲击键盘的疲劳。借助 Apple 原生高精度听写引擎与局域网极速 WebSocket 流，手机端说话即出文字，自由校验修改，一键将文字无缝注入 Mac 任意光标窗口。
-    </p>
-
-    <div class="hero-ctas">
-      <a href="#download" class="btn btn-primary" id="hero-download-btn">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-          <polyline points="7 10 12 15 17 10"></polyline>
-          <line x1="12" y1="15" x2="12" y2="3"></line>
-        </svg>
-        下载 macOS 客户端 (DMG)
-      </a>
-      <a href="https://github.com/idcpj/vocal" target="_blank" class="btn btn-secondary" id="hero-view-github-btn">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"></circle>
-          <polygon points="10 8 16 12 10 16 10 8"></polygon>
-        </svg>
-        查看源码与 iOS 构建
-      </a>
-    </div>
-
-    <div class="hero-badges">
-      <div class="hero-badge-item">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
-        <span>极低延迟 (&lt;20ms)</span>
+    <!-- Interactive Fluid Audio Waveform Canvas -->
+    <div class="hero-canvas-container">
+      <canvas id="hero-soundwave" class="hero-soundwave-canvas" title="交互式音频声波流体可视化"></canvas>
+      <div class="canvas-hint">
+        <span class="hint-dot"></span>
+        <span>声波可视化引擎已就绪 · 在下方体验交互式实时打字</span>
       </div>
-      <div class="hero-badge-item">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
-        <span>零云端上传 (纯局域网传输)</span>
-      </div>
-      <div class="hero-badge-item">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
-        <span>全局适配所有 Mac 应用</span>
-      </div>
-      <div class="hero-badge-item">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
-        <span>支持数十种系统语言</span>
-      </div>
-    </div>
-
-    <!-- Live Audio Waveform Simulation -->
-    <div class="waveform-container" title="Audio waveform visualization">
-      <div class="wave-bar"></div>
-      <div class="wave-bar"></div>
-      <div class="wave-bar"></div>
-      <div class="wave-bar"></div>
-      <div class="wave-bar"></div>
-      <div class="wave-bar"></div>
-      <div class="wave-bar"></div>
-      <div class="wave-bar"></div>
     </div>
   </header>
 
-  <!-- Showcase Section (Dual Device) -->
+  <!-- Interactive Playground Section -->
+  <section class="playground-section" id="playground">
+    <div class="section-header">
+      <div class="section-tag glow-tag">LIVE SIMULATION PLAYGROUND</div>
+      <h2 class="section-title">趣味互动体验区：实时语音输入模拟器</h2>
+      <p class="section-desc">
+        无需安装即可直观体验！点击麦克风开启语音识别，或点击预设短语生成草稿，体验一键光速注入 Mac 活跃焦点的畅快感。
+      </p>
+    </div>
+
+    <!-- Playground Main Workbench -->
+    <div class="playground-workbench">
+
+      <!-- Left Panel: Virtual Mobile Client (iPhone / Android) -->
+      <div class="phone-mockup-wrapper">
+        <div class="mockup-header-title">
+          <span class="mockup-indicator-chip mobile-chip">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+            手机客户端 (Flutter)
+          </span>
+          <span class="connection-pill connected" id="phone-connection-status">
+            <span class="status-pulse-dot"></span>
+            已连接 Mac (192.168.1.108:8888)
+          </span>
+        </div>
+
+        <div class="phone-frame">
+          <!-- Dynamic Island / Top Notch -->
+          <div class="phone-island">
+            <div class="island-camera"></div>
+            <div class="island-mic"></div>
+          </div>
+
+          <!-- Phone Inner Screen -->
+          <div class="phone-screen">
+            <!-- Mobile App Top Bar -->
+            <div class="app-topbar">
+              <div class="app-brand">
+                <span class="app-logo-badge">🎙️</span>
+                <span class="app-title-name">Vocal</span>
+              </div>
+              <!-- Language Selector Capsule -->
+              <div class="language-capsule" id="sim-lang-selector">
+                <span class="lang-globe">🌐</span>
+                <select id="sim-lang" aria-label="选择识别语言">
+                  <option value="zh-CN" selected>普通话 (中国)</option>
+                  <option value="en-US">English (US)</option>
+                  <option value="zh-HK">粤语 (香港)</option>
+                  <option value="ja-JP">日本語 (Japan)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Draft Area -->
+            <div class="draft-container">
+              <div class="draft-header">
+                <span class="draft-label">本地临时草稿 (Local Draft)</span>
+                <span class="draft-counter" id="draft-char-count">0 字</span>
+              </div>
+              <textarea id="sim-draft-box" class="draft-textarea" placeholder="点击下方麦克风说话，或选择场景短语，也可以直接在此键盘编辑错别字..." rows="4"></textarea>
+              <div class="draft-cursor-row">
+                <span class="editing-state-tip" id="sim-status-tip">就绪：等待语音采集</span>
+                <button class="clear-draft-btn" id="btn-clear-draft" title="清空当前草稿">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                  清空
+                </button>
+              </div>
+            </div>
+
+            <!-- Quick Preset Phrases Carousel -->
+            <div class="preset-phrases-group">
+              <div class="preset-title">💡 趣味预设短语 (点击快速体验)：</div>
+              <div class="phrases-scroll">
+                <button class="phrase-chip" data-phrase="帮我写一个基于 Python 的高并发网络请求模块，并加入优雅退出机制。">
+                  💻 写 Python 代码
+                </button>
+                <button class="phrase-chip" data-phrase="刚刚对齐完项目进度，架构重构方案已通过，今晚下班去吃椰子鸡！">
+                  💬 日常微信沟通
+                </button>
+                <button class="phrase-chip" data-phrase="Vocal 的毫秒级本地注入太丝滑了，双手完全解放，效率提升翻倍！">
+                  🚀 赞叹输入效率
+                </button>
+                <button class="phrase-chip" data-phrase="Deploying Kubernetes cluster hotfix across all production nodes now.">
+                  🌐 英文终端指令
+                </button>
+              </div>
+            </div>
+
+            <!-- Voice Control & Action Bottom Bar -->
+            <div class="phone-action-bar">
+              <div class="toggle-enter-row">
+                <label class="switch-control">
+                  <input type="checkbox" id="sim-auto-enter" checked>
+                  <span class="switch-slider"></span>
+                </label>
+                <span class="toggle-label">发送后自动回车 (Enter)</span>
+              </div>
+
+              <!-- Main Floating Mic Button -->
+              <div class="mic-button-wrapper">
+                <button class="sim-mic-button" id="btn-toggle-mic" aria-label="开始/停止语音输入">
+                  <div class="mic-wave-pulse"></div>
+                  <div class="mic-icon-circle">
+                    <svg class="mic-svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                      <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                      <line x1="12" y1="19" x2="12" y2="23"></line>
+                      <line x1="8" y1="23" x2="16" y2="23"></line>
+                    </svg>
+                  </div>
+                </button>
+                <span class="mic-status-label" id="mic-status-text">点击开始录音</span>
+              </div>
+
+              <!-- Send Button -->
+              <button class="btn-send-mac" id="btn-send-mac">
+                <span class="send-glow-effect"></span>
+                <span class="send-text">发送到 Mac</span>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <line x1="22" y1="2" x2="11" y2="13"></line>
+                  <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Center Pipeline: LAN Packet Transmission Visualization -->
+      <div class="pipeline-connector-wrapper">
+        <div class="pipeline-track" id="pipeline-track">
+          <div class="data-packet-particle" id="data-packet"></div>
+        </div>
+
+        <div class="pipeline-metrics-badge">
+          <div class="metric-row">
+            <span class="metric-key">传输协议</span>
+            <span class="metric-val">WebSocket (ws://)</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-key">往返延迟</span>
+            <span class="metric-val highlight-green" id="sim-latency-val">~11ms</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-key">组网拓扑</span>
+            <span class="metric-val">mDNS _vocal._tcp</span>
+          </div>
+        </div>
+
+        <!-- Realtime JSON Payload Peek Drawer -->
+        <div class="payload-inspector">
+          <div class="inspector-header">
+            <span class="json-tag">JSON PAYLOAD</span>
+            <span class="flow-arrow">⇄ LAN</span>
+          </div>
+          <pre class="inspector-code" id="payload-preview">{
+  "type": "text_append",
+  "text": "",
+  "enter": true
+}</pre>
+        </div>
+      </div>
+
+      <!-- Right Panel: Virtual Mac / PC Host & Target Applications -->
+      <div class="host-mockup-wrapper">
+        <div class="mockup-header-title">
+          <span class="mockup-indicator-chip host-chip">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+            电脑宿主端 (Mac Accessibility / Windows SendInput)
+          </span>
+          <!-- App Switcher Tabs -->
+          <div class="app-switcher-tabs" id="app-tabs">
+            <button class="app-tab active" data-app="vscode">
+              <span class="tab-icon">⚡</span>
+              <span>VS Code</span>
+            </button>
+            <button class="app-tab" data-app="notes">
+              <span class="tab-icon">📝</span>
+              <span>备忘录</span>
+            </button>
+            <button class="app-tab" data-app="chat">
+              <span class="tab-icon">💬</span>
+              <span>微信/Chat</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Host Window Chrome -->
+        <div class="host-window">
+          <!-- Window Title Bar -->
+          <div class="window-titlebar">
+            <div class="mac-traffic-lights">
+              <span class="traffic-light light-red"></span>
+              <span class="traffic-light light-yellow"></span>
+              <span class="traffic-light light-green"></span>
+            </div>
+            <div class="window-title" id="active-app-title">workspace/vocal — main.py (VS Code)</div>
+            <div class="host-menubar-status">
+              <span class="vocal-tray-icon" title="Vocal 宿主已在状态栏常驻">🎙️</span>
+              <span class="tray-status-dot"></span>
+            </div>
+          </div>
+
+          <!-- Window Inner Canvas -->
+          <div class="window-body">
+
+            <!-- App View 1: VS Code Editor -->
+            <div class="app-view active" id="view-vscode">
+              <div class="editor-gutter">
+                <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span>
+              </div>
+              <div class="editor-content">
+                <div class="code-line"><span class="code-keyword">import</span> <span class="code-module">vocal</span></div>
+                <div class="code-line"><span class="code-keyword">async def</span> <span class="code-func">main</span>():</div>
+                <div class="code-line indent-1"><span class="code-comment"># Vocal 语音输入光标已定位在此处：</span></div>
+                <div class="code-line indent-1 injected-line" id="vscode-injected-content">
+                  <span class="code-string">"点击左侧“发送到 Mac”，文本将以毫秒级打字机动效注入此处..."</span>
+                </div>
+                <div class="code-line indent-1">
+                  <span class="cursor-blink">|</span>
+                </div>
+                <div class="code-line"><span class="code-keyword">if</span> __name__ == <span class="code-string">"__main__"</span>:</div>
+                <div class="code-line indent-1">vocal.run()</div>
+              </div>
+            </div>
+
+            <!-- App View 2: Notes / Document -->
+            <div class="app-view" id="view-notes">
+              <div class="notes-header">
+                <div class="notes-date">2026年11月13日 星期五 · 灵感速记</div>
+                <h3 class="notes-heading">Vocal 新功能规划会议纪要</h3>
+              </div>
+              <div class="notes-body" id="notes-injected-content">
+                <p>1. 极简科技暗黑风官网正式上线；</p>
+                <p>2. 支持手机端直接录入长文本并实时修正；</p>
+                <p class="injected-note-p"><em>（新注入内容将在此段落追加...）</em></p>
+              </div>
+              <span class="cursor-blink notes-cursor">|</span>
+            </div>
+
+            <!-- App View 3: Chat / Messaging -->
+            <div class="app-view" id="view-chat">
+              <div class="chat-messages-container" id="chat-messages-box">
+                <div class="chat-bubble left">
+                  <div class="chat-avatar">AI</div>
+                  <div class="chat-bubble-text">嗨！试着在左侧手机上说句话或者选一段短语，然后点击“发送到 Mac”发给我吧～</div>
+                </div>
+              </div>
+              <div class="chat-input-bar">
+                <div class="chat-fake-input" id="chat-input-text">
+                  <span class="chat-placeholder">等待来自手机的键盘字符注入...</span>
+                  <span class="cursor-blink">|</span>
+                </div>
+                <button class="chat-fake-send" aria-label="发送">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                </button>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Bottom Status Bar -->
+          <div class="host-statusbar">
+            <div class="status-col">
+              <span class="stat-indicator green"></span>
+              <span>Accessibility CGEvent 驱动已就绪</span>
+            </div>
+            <div class="status-metrics">
+              <span>已模拟注入: <strong id="stat-injected-chars">0</strong> 字符</span>
+              <span class="sep">|</span>
+              <span>节省时间: <strong id="stat-saved-seconds">0</strong> 秒</span>
+              <span class="sep">|</span>
+              <span>丢包率: <strong>0.0%</strong></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Four-Platform Ecosystem Matrix Section -->
+  <section class="platforms-section" id="platforms">
+    <div class="section-header">
+      <div class="section-tag glow-tag">FOUR-PLATFORM ECOSYSTEM</div>
+      <h2 class="section-title">全平台矩阵：四端无缝协同生态</h2>
+      <p class="section-desc">
+        无论您使用的是 iPhone 还是 Android 手机，MacBook 还是 Windows 极客主机，Vocal 均提供端到端高精度适配。
+      </p>
+    </div>
+
+    <div class="platforms-grid">
+      <!-- Platform 1: macOS Host -->
+      <div class="platform-card">
+        <div class="card-glow-edge cyan"></div>
+        <div class="platform-header">
+          <div class="platform-icon-box mac-icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.37c.62-.75 1.04-1.8 0.92-2.85-.9.04-2 .6-2.65 1.34-.56.63-1.05 1.68-.92 2.71 1.01.08 2.03-.5 2.65-1.2z"/>
+            </svg>
+          </div>
+          <div class="platform-meta">
+            <h3 class="platform-title">macOS 宿主端</h3>
+            <span class="platform-subtitle">原生 Swift · 零依赖 · 菜单栏常驻</span>
+          </div>
+          <span class="platform-status-badge active">稳定支持</span>
+        </div>
+        <p class="platform-desc">
+          基于 Swift 原生开发，无第三方库依赖。通过系统辅助功能 (Accessibility) <code>CGEvent</code> 直接向活跃光标应用精准派发 Unicode 击键事件，开机静默启动，零 Dock 栏视觉打扰。
+        </p>
+        <div class="platform-features-list">
+          <div class="pf-item"><span class="pf-bullet">✓</span>轻量 Network.framework WebSocket 服务 (8888 端口)</div>
+          <div class="pf-item"><span class="pf-bullet">✓</span>Bonjour (mDNS) 自动服务发现与网络多播广播</div>
+          <div class="pf-item"><span class="pf-bullet">✓</span>秒级 <code>swiftc</code> 编译，提供开箱即用 DMG 安装包</div>
+        </div>
+        <div class="platform-footer-actions">
+          <a href="#download-mac" class="platform-link-btn">下载 DMG 包 →</a>
+        </div>
+      </div>
+
+      <!-- Platform 2: Windows Host -->
+      <div class="platform-card">
+        <div class="card-glow-edge blue"></div>
+        <div class="platform-header">
+          <div class="platform-icon-box win-icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/>
+            </svg>
+          </div>
+          <div class="platform-meta">
+            <h3 class="platform-title">Windows 宿主端</h3>
+            <span class="platform-subtitle">Win32 API · SendInput 毫秒注入</span>
+          </div>
+          <span class="platform-status-badge active">新版支持</span>
+        </div>
+        <p class="platform-desc">
+          专为 Windows 10/11 优化打造。调用底层 <code>SendInput</code> Win32 API 模拟硬件级键盘敲击，完美兼容 Office 全家桶、微信 PC 版、Notion 以及各大 IDE。
+        </p>
+        <div class="platform-features-list">
+          <div class="pf-item"><span class="pf-bullet">✓</span>系统托盘 (System Tray) 常驻与双色连接指示灯</div>
+          <div class="pf-item"><span class="pf-bullet">✓</span>底层 Winsock 高性能非阻塞 WebSocket 通信链路</div>
+          <div class="pf-item"><span class="pf-bullet">✓</span>支持绿色免安装免提权运行与一键开机自启</div>
+        </div>
+        <div class="platform-footer-actions">
+          <a href="#download-win" class="platform-link-btn">获取 Windows 版 →</a>
+        </div>
+      </div>
+
+      <!-- Platform 3: iOS Client -->
+      <div class="platform-card">
+        <div class="card-glow-edge purple"></div>
+        <div class="platform-header">
+          <div class="platform-icon-box ios-icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="5" y="2" width="14" height="20" rx="3" ry="3"></rect>
+              <line x1="12" y1="18" x2="12.01" y2="18"></line>
+            </svg>
+          </div>
+          <div class="platform-meta">
+            <h3 class="platform-title">iOS 移动客户端</h3>
+            <span class="platform-subtitle">SFSpeechRecognizer · 端侧神经网络</span>
+          </div>
+          <span class="platform-status-badge active">主流主力</span>
+        </div>
+        <p class="platform-desc">
+          深度调用 iPhone 硬件级麦克风波束成形降噪与 Apple <code>SFSpeechRecognizer</code> 原生语音识别引擎。离线识别准确率极高，草稿手势编辑与暗黑极简科技风界面浑然天成。
+        </p>
+        <div class="platform-features-list">
+          <div class="pf-item"><span class="pf-bullet">✓</span>本地草稿累加，彻底告别实时流式抖动与误删</div>
+          <div class="pf-item"><span class="pf-bullet">✓</span>极速局域网 NSD 自动握手与心跳断线重连机制</div>
+          <div class="pf-item"><span class="pf-bullet">✓</span>全球 50+ 系统识别语言一键无缝抽屉切换</div>
+        </div>
+        <div class="platform-footer-actions">
+          <a href="#download-ios" class="platform-link-btn">预约 TestFlight / 源码 →</a>
+        </div>
+      </div>
+
+      <!-- Platform 4: Android Client -->
+      <div class="platform-card">
+        <div class="card-glow-edge emerald"></div>
+        <div class="platform-header">
+          <div class="platform-icon-box android-icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M17.523 15.3414c-.5511 0-.9993-.4486-.9993-.9997s.4482-.9993.9993-.9993c.551 0 .9993.4482.9993.9993.0001.5511-.4482.9997-.9993.9997m-11.046 0c-.5511 0-.9993-.4486-.9993-.9997s.4482-.9993.9993-.9993c.5511 0 .9993.4482.9993.9993 0 .5511-.4482.9997-.9993.9997m11.4045-6.02l1.9973-3.4592a.416.416 0 00-.1521-.5676.416.416 0 00-.5676.1521l-2.0223 3.503C15.5802 8.403 13.8407 8.1 12 8.1s-3.5802.303-5.1368.8497L4.8409 5.4467a.4161.4161 0 00-.5677-.1521.4157.4157 0 00-.1521.5676l1.9973 3.4592C2.6889 11.1867.3432 14.6589 0 18.761h24c-.3432-4.1021-2.6889-7.5743-6.1185-9.4396"/>
+            </svg>
+          </div>
+          <div class="platform-meta">
+            <h3 class="platform-title">Android 移动客户端</h3>
+            <span class="platform-subtitle">Flutter 跨端 · NSD 多播锁穿透适配</span>
+          </div>
+          <span class="platform-status-badge active">已支持</span>
+        </div>
+        <p class="platform-desc">
+          基于 Flutter 框架全量适配 Android 平台规范。精细处理 Android 平台 <code>MulticastLock</code> 组网穿透机制，支持原生系统语音识别服务与离线语音包容灾降级。
+        </p>
+        <div class="platform-features-list">
+          <div class="pf-item"><span class="pf-bullet">✓</span>Android 11 ~ 15 多版本系统麦克风权限安全合规</div>
+          <div class="pf-item"><span class="pf-bullet">✓</span>全面适配折叠屏、全手势导航与暗黑主题</div>
+          <div class="pf-item"><span class="pf-bullet">✓</span>单 APK 安装包体积精简，极速启动运行</div>
+        </div>
+        <div class="platform-footer-actions">
+          <a href="#download-android" class="platform-link-btn">下载 Android APK →</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Showcase Section: Real Dual-Device Synergy -->
   <section class="showcase-section" id="showcase">
     <div class="section-header">
-      <div class="section-tag">Double Screen Synergy</div>
-      <h2 class="section-title">双端配合，如丝顺滑</h2>
-      <p class="section-desc">手机专精于高精度语音捕获与文字校对，Mac 端静默常驻在菜单栏负责焦点文字注入。</p>
+      <div class="section-tag glow-tag">REAL APP SCREENSHOTS</div>
+      <h2 class="section-title">真实双端协同：极简设计，极致纯粹</h2>
+      <p class="section-desc">手机专精于高精度语音捕获与文字校对，电脑端静默常驻在系统栏负责焦点文字注入。</p>
     </div>
 
     <div class="showcase-grid">
@@ -122,13 +581,13 @@
       <div class="showcase-card">
         <div class="card-header-bar">
           <div class="device-tag">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
-            iPhone 客户端 (Flutter)
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+            <span>移动客户端界面 (Flutter)</span>
           </div>
-          <div class="status-dot" title="在线就绪"></div>
+          <span class="live-status-pill"><span class="status-dot"></span>在线就绪</span>
         </div>
         <div class="card-img-wrapper">
-          <img src="images/vocal_mobile_app.png" alt="Vocal iPhone 客户端真实截图" class="showcase-img" id="img-mobile-app">
+          <img src="images/vocal_mobile_app.png" alt="Vocal 移动客户端真实截图" class="showcase-img" id="img-mobile-app">
         </div>
         <div class="card-caption">
           <strong>📱 本地草稿 + 手动发送：</strong> 支持语音听写、软键盘修改错别字、多语言随时切换，点击“发送到 Mac”完成推送。
@@ -137,18 +596,19 @@
 
       <!-- Realtime Flow Pill Badge -->
       <div class="flow-connector">
+        <div class="flow-connector-pulse"></div>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="13 17 18 12 13 7"></polyline><polyline points="6 17 11 12 6 7"></polyline></svg>
-        局域网 WebSocket 极速直连
+        <span>局域网 WebSocket 极速直连</span>
       </div>
 
       <!-- Mac Host Card -->
       <div class="showcase-card">
         <div class="card-header-bar">
           <div class="device-tag">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
-            macOS 宿主程序 (Swift)
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+            <span>macOS 宿主菜单栏面板 (Swift)</span>
           </div>
-          <div class="status-dot" title="服务监听中"></div>
+          <span class="live-status-pill"><span class="status-dot"></span>服务监听中</span>
         </div>
         <div class="card-img-wrapper">
           <img src="images/vocal_mac_host.png" alt="Vocal Mac 宿主程序菜单栏截图" class="showcase-img" id="img-mac-host">
@@ -163,89 +623,132 @@
   <!-- Features Grid Section -->
   <section class="features-section" id="features">
     <div class="section-header">
-      <div class="section-tag">Features</div>
-      <h2 class="section-title">专为极客与创作者打造</h2>
-      <p class="section-desc">每一个细节都为了极致的打字速度、稳定性和隐私安全而设计。</p>
+      <div class="section-tag glow-tag">POWERFUL CAPABILITIES</div>
+      <h2 class="section-title">专为极客、写作者与创作者打造</h2>
+      <p class="section-desc">每一个微小细节都为了极致的打字速度、稳定性和隐私安全而深度打磨。</p>
     </div>
 
     <div class="features-grid">
       <!-- Feature 1 -->
       <div class="feature-box">
-        <div class="feature-icon-wrapper">⚡</div>
+        <div class="feature-icon-wrapper neon-cyan">⚡</div>
         <h3 class="feature-title">毫秒级低延迟通信</h3>
-        <p class="feature-desc">基于原生 TCP 与轻量 WebSocket 协议，手机与 Mac 在局域网直接点对点建连，传输延迟小于 20ms，体验如同本地物理键盘。</p>
+        <p class="feature-desc">基于底层原生 TCP 与极轻量 WebSocket 长连接，手机与电脑在本地局域网直接点对点建连，传输延迟小于 15ms，体验如同物理机械键盘敲击。</p>
       </div>
 
       <!-- Feature 2 -->
       <div class="feature-box">
-        <div class="feature-icon-wrapper">🍎</div>
-        <h3 class="feature-title">Apple 原生语音识别</h3>
-        <p class="feature-desc">深度集成 iOS <code>SFSpeechRecognizer</code> 听写引擎，充分利用 iPhone 硬件麦克风降噪和端侧神经网络引擎，识别精准度极高。</p>
+        <div class="feature-icon-wrapper neon-blue">🍎</div>
+        <h3 class="feature-title">端侧原生语音识别引擎</h3>
+        <p class="feature-desc">深度集成 iOS <code>SFSpeechRecognizer</code> 与 Android 语音转录栈，充分发挥移动设备硬件阵列麦克风降噪和端侧神经网络芯片，识别准确率无与伦比。</p>
       </div>
 
       <!-- Feature 3 -->
       <div class="feature-box">
-        <div class="feature-icon-wrapper">🔍</div>
+        <div class="feature-icon-wrapper neon-purple">🔍</div>
         <h3 class="feature-title">mDNS 自动零配置组网</h3>
-        <p class="feature-desc">Mac 端通过 Bonjour 自动发布 <code>_vocal._tcp</code> 服务，手机端打开即可自动发现，无需手动查看和输入局域网 IP 地址。</p>
+        <p class="feature-desc">电脑端通过 Bonjour / NSD 自动发布 <code>_vocal._tcp</code> 服务，手机端打开瞬间完成自动扫描与秒级连通，彻底告别繁琐的手动输入 IP 时代。</p>
       </div>
 
       <!-- Feature 4 -->
       <div class="feature-box">
-        <div class="feature-icon-wrapper">✍️</div>
+        <div class="feature-icon-wrapper neon-emerald">✍️</div>
         <h3 class="feature-title">本地草稿与手动发送</h3>
-        <p class="feature-desc">彻底告别实时流式发送导致的文字抖动与撤回冲突！文字在手机端先累加保存，允许从容纠错或继续编辑，确认后再点击发送。</p>
+        <p class="feature-desc">彻底杜绝实时流式直接上屏导致的字符抖动、退格冲突与错别字尴尬！文字在手机端先累加保存，允许从容润色纠错，确认后再一键毫秒注入。</p>
       </div>
 
       <!-- Feature 5 -->
       <div class="feature-box">
-        <div class="feature-icon-wrapper">🌐</div>
+        <div class="feature-icon-wrapper neon-amber">🌐</div>
         <h3 class="feature-title">多语言实时无缝切换</h3>
-        <p class="feature-desc">内置普通话、粤语、英语、日语、韩语等数十种语言切换抽屉，一键搜索与更换识别语言，满足跨语言输入需求。</p>
+        <p class="feature-desc">内置普通话、粤语、英语、日语、韩语等数十种主流语言切换抽屉，无需重启应用，一键更换识别模型，跨语种创作畅通无阻。</p>
       </div>
 
       <!-- Feature 6 -->
       <div class="feature-box">
-        <div class="feature-icon-wrapper">⌨️</div>
-        <h3 class="feature-title">macOS 全局无障碍注入</h3>
-        <p class="feature-desc">利用 macOS 辅助功能 API（<code>CGEvent</code> Unicode 注入），无论当前活跃窗口是 VS Code、备忘录、微信还是浏览器，皆能瞬间键入。</p>
+        <div class="feature-icon-wrapper neon-rose">⌨️</div>
+        <h3 class="feature-title">全系统无障碍无缝注入</h3>
+        <p class="feature-desc">利用 macOS 辅助功能 API（<code>CGEvent</code> Unicode）与 Windows <code>SendInput</code>，无论当前活跃窗口是 VS Code、备忘录、微信还是浏览器，皆能精准敲入。</p>
       </div>
     </div>
   </section>
 
-  <!-- Architecture Section -->
+  <!-- Architecture & Protocol Section -->
   <section class="arch-section" id="architecture">
     <div class="arch-card">
-      <div class="section-header" style="margin-bottom: 2rem;">
-        <div class="section-tag">How It Works</div>
-        <h2 class="section-title">工作原理与数据流</h2>
-        <p class="section-desc">纯粹、清晰的四步流转流程，全程本地闭环，无外部依赖。</p>
+      <div class="section-header" style="margin-bottom: 2.5rem;">
+        <div class="section-tag glow-tag">HOW IT WORKS</div>
+        <h2 class="section-title">全链路工作原理与数据流转</h2>
+        <p class="section-desc">纯粹、清晰的四步流转流程，端到端本地安全闭环，零外部中继。</p>
       </div>
 
       <div class="arch-steps">
         <div class="arch-step-item">
           <div class="step-num">STEP 01</div>
-          <h4 class="step-title">自动发现 & 建连</h4>
-          <p class="step-desc">Mac 端在 8888 端口启动监听并广播 mDNS；iPhone 扫描到后建立 WebSocket 长连接与心跳保活。</p>
+          <h4 class="step-title">自动发现 & 双向建连</h4>
+          <p class="step-desc">电脑端在 8888 端口启动监听并通过 Bonjour/mDNS 广播；手机客户端扫描到后建立 WebSocket 长连接与心跳保活。</p>
         </div>
 
         <div class="arch-step-item">
           <div class="step-num">STEP 02</div>
-          <h4 class="step-title">高精度语音采集</h4>
-          <p class="step-desc">iPhone 调用本地语音识别，将说话声音实时转换为文字草稿，并在手机界面清晰呈现。</p>
+          <h4 class="step-title">高保真语音采集与识别</h4>
+          <p class="step-desc">手机调用系统级端侧听写引擎，将人声高精准转译为文本，实时呈现在手机端可编辑的草稿区域。</p>
         </div>
 
         <div class="arch-step-item">
           <div class="step-num">STEP 03</div>
-          <h4 class="step-title">审阅与点击发送</h4>
-          <p class="step-desc">用户在手机屏幕上审阅文字、可随意修改错别字或追加输入，点击“发送到 Mac”瞬时发出整句。</p>
+          <h4 class="step-title">即时审阅与一键推送</h4>
+          <p class="step-desc">用户在手机屏幕上审阅文字、可随意修正错字或追加输入，点击“发送到 Mac/PC”或回车瞬时封包发出。</p>
         </div>
 
         <div class="arch-step-item">
           <div class="step-num">STEP 04</div>
-          <h4 class="step-title">光标应用注入</h4>
-          <p class="step-desc">Mac 宿主收到纯字符串，调用 CGEvent 模拟键盘按键，将文字无缝敲入当前光标所在的应用程序中。</p>
+          <h4 class="step-title">光标应用精准字符注入</h4>
+          <p class="step-desc">电脑端接收到纯文本或控制指令，调用底层的系统辅助 API 模拟按键，将文字无缝敲入当前光标所在的活跃窗口中。</p>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Privacy & Local Security Section -->
+  <section class="security-section" id="security">
+    <div class="section-header">
+      <div class="section-tag glow-tag">SECURITY &amp; PRIVACY</div>
+      <h2 class="section-title">局域网安全与隐私说明</h2>
+      <p class="section-desc">您的声音与创作属于您自己，Vocal 从架构根源守护您的数字隐私。</p>
+    </div>
+
+    <div class="security-grid">
+      <div class="security-card">
+        <div class="security-icon-circle">🔒</div>
+        <h3 class="security-title">零云端上传承诺</h3>
+        <p class="security-desc">
+          我们不运营、不租用任何中继云服务器。所有数据只在您身处的局域网（Home/Office Wi-Fi）内点对点流转，数据包绝不离开物理路由器。
+        </p>
+      </div>
+
+      <div class="security-card">
+        <div class="security-icon-circle">🛡️</div>
+        <h3 class="security-title">端侧本地语音模型</h3>
+        <p class="security-desc">
+          优先调用 Apple Neural Engine 及 Android 离线语言包进行端侧转写。即便拔掉外网网线，局域网内的打字输入功能依旧丝滑可用。
+        </p>
+      </div>
+
+      <div class="security-card">
+        <div class="security-icon-circle">🔑</div>
+        <h3 class="security-title">PIN 码首次配对防蹭键盘</h3>
+        <p class="security-desc">
+          支持首次连接时的 6 位动态 PIN 码安全握手验证，确保公共 Wi-Fi 或合租环境下，只有持有合法配对码的移动设备才能注入文本。
+        </p>
+      </div>
+
+      <div class="security-card">
+        <div class="security-icon-circle">📶</div>
+        <h3 class="security-title">纯点对点 mDNS 组网</h3>
+        <p class="security-desc">
+          采用遵循 RFC 6762 标准的 <code>_vocal._tcp</code> 多播 DNS 服务广播，手机无需任何公网穿透或端口映射，即开即连。
+        </p>
       </div>
     </div>
   </section>
@@ -253,156 +756,345 @@
   <!-- Download & Quick Start Section -->
   <section class="install-section" id="download">
     <div class="section-header">
-      <div class="section-tag">Get Started</div>
-      <h2 class="section-title">快速开始使用</h2>
-      <p class="section-desc">仅需两步配置，立即体验极速语音输入的畅快感。</p>
+      <div class="section-tag glow-tag">DOWNLOAD CENTER</div>
+      <h2 class="section-title">快速下载与安装指南</h2>
+      <p class="section-desc">选择您的设备平台，仅需 1 分钟即可开启无线极速语音输入体验。</p>
     </div>
 
-    <div class="install-grid">
-      <!-- Mac Setup Card -->
-      <div class="install-card">
-        <div class="install-card-title">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
-          第一步：Mac 宿主程序设置
-        </div>
-        <p style="color: var(--text-secondary); font-size: 0.95rem; margin-bottom: 1rem;">
-          宿主程序以菜单栏 Accessory 形式常驻运行。您可以直接构建 DMG 安装包或在本地编译运行：
-        </p>
-
-        <div class="terminal-box">
-          <div class="terminal-header">
-            <div class="term-dots">
-              <div class="term-dot dot-red"></div>
-              <div class="term-dot dot-yellow"></div>
-              <div class="term-dot dot-green"></div>
-            </div>
-            <button class="copy-btn" data-target="cmd-mac-build">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-              复制
-            </button>
-          </div>
-          <div class="terminal-body" id="cmd-mac-build">
-<span class="terminal-comment"># 构建专属 macOS DMG 安装包</span>
-./mac/build_macos.sh
-<span class="terminal-comment"># 或直接单文件编译并启动</span>
-swiftc -o VocalHost mac/VocalHostApp.swift -parse-as-library &amp;&amp; ./VocalHost</div>
-        </div>
-
-        <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.75rem;">
-          ⚠️ <strong>权限注意：</strong> 首次运行后，请前往 <code>系统设置 &gt; 隐私与安全性 &gt; 辅助功能</code> 勾选授权 <strong>VocalHost</strong>。
-        </p>
+    <!-- Download Platforms Tabs -->
+    <div class="download-tabs-container">
+      <div class="download-tabs-nav" id="download-tabs">
+        <button class="dl-tab-btn active" data-tab="dl-mac" id="download-mac">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.37c.62-.75 1.04-1.8 0.92-2.85-.9.04-2 .6-2.65 1.34-.56.63-1.05 1.68-.92 2.71 1.01.08 2.03-.5 2.65-1.2z"/></svg>
+          <span>macOS 宿主</span>
+        </button>
+        <button class="dl-tab-btn" data-tab="dl-win" id="download-win">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
+          <span>Windows 宿主</span>
+        </button>
+        <button class="dl-tab-btn" data-tab="dl-ios" id="download-ios">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="3" ry="3"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+          <span>iOS 客户端</span>
+        </button>
+        <button class="dl-tab-btn" data-tab="dl-android" id="download-android">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.523 15.3414c-.5511 0-.9993-.4486-.9993-.9997s.4482-.9993.9993-.9993c.551 0 .9993.4482.9993.9993.0001.5511-.4482.9997-.9993.9997m-11.046 0c-.5511 0-.9993-.4486-.9993-.9997s.4482-.9993.9993-.9993c.5511 0 .9993.4482.9993.9993 0 .5511-.4482.9997-.9993.9997m11.4045-6.02l1.9973-3.4592a.416.416 0 00-.1521-.5676.416.416 0 00-.5676.1521l-2.0223 3.503C15.5802 8.403 13.8407 8.1 12 8.1s-3.5802.303-5.1368.8497L4.8409 5.4467a.4161.4161 0 00-.5677-.1521.4157.4157 0 00-.1521.5676l1.9973 3.4592C2.6889 11.1867.3432 14.6589 0 18.761h24c-.3432-4.1021-2.6889-7.5743-6.1185-9.4396"/></svg>
+          <span>Android 客户端</span>
+        </button>
       </div>
 
-      <!-- iOS Setup Card -->
-      <div class="install-card">
-        <div class="install-card-title">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
-          第二步：iPhone 客户端运行
-        </div>
-        <p style="color: var(--text-secondary); font-size: 0.95rem; margin-bottom: 1rem;">
-          客户端基于 Flutter 构建。连接您的真机 iPhone 并在局域网内运行：
-        </p>
+      <!-- Tab Content Panels -->
+      <div class="download-tab-contents">
 
-        <div class="terminal-box">
-          <div class="terminal-header">
-            <div class="term-dots">
-              <div class="term-dot dot-red"></div>
-              <div class="term-dot dot-yellow"></div>
-              <div class="term-dot dot-green"></div>
+        <!-- macOS Tab -->
+        <div class="dl-tab-pane active" id="pane-dl-mac">
+          <div class="pane-content-grid">
+            <div class="pane-info">
+              <h3 class="pane-title">macOS 宿主程序 (Apple Silicon &amp; Intel)</h3>
+              <p class="pane-desc">支持 macOS 13.0 Ventura、macOS 14 Sonoma 及最新 macOS 15+。原生菜单栏 Accessory 模式，开箱即用。</p>
+              <div class="download-cta-row">
+                <a href="https://github.com/idcpj/vocal/releases" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-lg glow-btn">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                  <span>下载 Vocal-macOS-v1.2.0.dmg</span>
+                </a>
+              </div>
+              <div class="perm-alert-box">
+                <span class="alert-icon">⚠️</span>
+                <span>首次启动后，请在 <code>系统设置 &gt; 隐私与安全性 &gt; 辅助功能</code> 勾选授权 <strong>VocalHost</strong>，以允许模拟键盘输入。</span>
+              </div>
             </div>
-            <button class="copy-btn" data-target="cmd-ios-run">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-              复制
-            </button>
+
+            <div class="pane-terminal">
+              <div class="terminal-box">
+                <div class="terminal-header">
+                  <div class="term-dots">
+                    <span class="term-dot dot-red"></span>
+                    <span class="term-dot dot-yellow"></span>
+                    <span class="term-dot dot-green"></span>
+                  </div>
+                  <span class="term-title">终端源码构建 / Homebrew</span>
+                  <button class="copy-btn" data-target="cmd-mac-install">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    复制
+                  </button>
+                </div>
+                <div class="terminal-body" id="cmd-mac-install">
+<span class="terminal-comment"># 克隆代码仓库并一键构建 DMG</span>
+git clone https://github.com/idcpj/vocal.git
+cd vocal && ./mac/build_macos.sh
+
+<span class="terminal-comment"># 或单文件独立秒级编译运行</span>
+swiftc -o VocalHost mac/VocalHostApp.swift -parse-as-library &amp;&amp; ./VocalHost</div>
+              </div>
+            </div>
           </div>
-          <div class="terminal-body" id="cmd-ios-run">
-<span class="terminal-comment"># 进入移动端工程目录</span>
-cd mobile
-<span class="terminal-comment"># iOS 26 真机请务必使用 profile 模式安装调试</span>
-fvm flutter run --profile</div>
         </div>
 
-        <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.75rem;">
-          💡 <strong>网络要求：</strong> iPhone 与 Mac 须处于同一个 Wi-Fi 网络（路由器勿开启 AP 隔离）。
-        </p>
+        <!-- Windows Tab -->
+        <div class="dl-tab-pane" id="pane-dl-win">
+          <div class="pane-content-grid">
+            <div class="pane-info">
+              <h3 class="pane-title">Windows 宿主程序 (Win10 / Win11 x64)</h3>
+              <p class="pane-desc">轻巧纯粹的绿色免安装托盘程序，基于 Win32 原生 API 构建，极低内存开销 (&lt;15MB)。</p>
+              <div class="download-cta-row">
+                <a href="https://github.com/idcpj/vocal/releases" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-lg glow-btn">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                  <span>下载 Vocal-Win-x64-v1.2.0.zip</span>
+                </a>
+              </div>
+              <div class="perm-alert-box">
+                <span class="alert-icon">💡</span>
+                <span>首次运行如遇 Windows Defender 智能防护提示，点击“更多信息”并选择“仍要运行”即可启动。</span>
+              </div>
+            </div>
+
+            <div class="pane-terminal">
+              <div class="terminal-box">
+                <div class="terminal-header">
+                  <div class="term-dots">
+                    <span class="term-dot dot-red"></span>
+                    <span class="term-dot dot-yellow"></span>
+                    <span class="term-dot dot-green"></span>
+                  </div>
+                  <span class="term-title">Winget / 包管理器快速安装</span>
+                  <button class="copy-btn" data-target="cmd-win-install">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    复制
+                  </button>
+                </div>
+                <div class="terminal-body" id="cmd-win-install">
+<span class="terminal-comment"># 使用 Windows 官方包管理器一键安装</span>
+winget install Vocal.VocalHost
+
+<span class="terminal-comment"># 或解压绿色压缩包后直接运行</span>
+.\VocalHost.exe</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- iOS Tab -->
+        <div class="dl-tab-pane" id="pane-dl-ios">
+          <div class="pane-content-grid">
+            <div class="pane-info">
+              <h3 class="pane-title">iOS 客户端 (iPhone · iOS 16+)</h3>
+              <p class="pane-desc">集成原生语音识别能力，提供纯黑科技风动效。可通过公测链接或本地源码编译部署。</p>
+              <div class="download-cta-row">
+                <a href="https://testflight.apple.com" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-lg glow-btn">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 14 14"></polyline></svg>
+                  <span>加入 Apple TestFlight 公测</span>
+                </a>
+                <a href="https://github.com/idcpj/vocal/tree/main/mobile" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-lg">
+                  <span>查看移动端源码</span>
+                </a>
+              </div>
+              <div class="perm-alert-box">
+                <span class="alert-icon">⚡</span>
+                <span>iOS 26 真机调试特别注意：请务必使用 <code>--profile</code> 模式运行，严禁在真机以 Debug 模式加载以免触发内存溢出。</span>
+              </div>
+            </div>
+
+            <div class="pane-terminal">
+              <div class="terminal-box">
+                <div class="terminal-header">
+                  <div class="term-dots">
+                    <span class="term-dot dot-red"></span>
+                    <span class="term-dot dot-yellow"></span>
+                    <span class="term-dot dot-green"></span>
+                  </div>
+                  <span class="term-title">Flutter 本地运行编译指令</span>
+                  <button class="copy-btn" data-target="cmd-ios-install">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    复制
+                  </button>
+                </div>
+                <div class="terminal-body" id="cmd-ios-install">
+<span class="terminal-comment"># 进入移动端 Flutter 工程</span>
+cd mobile
+<span class="terminal-comment"># 编译并以 Profile 模式运行在真机设备</span>
+fvm flutter run -d &lt;YOUR_IPHONE_ID&gt; --profile</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Android Tab -->
+        <div class="dl-tab-pane" id="pane-dl-android">
+          <div class="pane-content-grid">
+            <div class="pane-info">
+              <h3 class="pane-title">Android 客户端 (Android 10+)</h3>
+              <p class="pane-desc">全手势适配、支持局域网 MulticastLock 组网穿透与各厂商语音引擎容灾降级。</p>
+              <div class="download-cta-row">
+                <a href="https://github.com/idcpj/vocal/releases" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-lg glow-btn">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                  <span>直接下载 Vocal-v1.2.0.apk</span>
+                </a>
+              </div>
+              <div class="perm-alert-box">
+                <span class="alert-icon">💡</span>
+                <span>首次安装后打开，请允许“麦克风录音权限”和“本地网络设备发现权限”。</span>
+              </div>
+            </div>
+
+            <div class="pane-terminal">
+              <div class="terminal-box">
+                <div class="terminal-header">
+                  <div class="term-dots">
+                    <span class="term-dot dot-red"></span>
+                    <span class="term-dot dot-yellow"></span>
+                    <span class="term-dot dot-green"></span>
+                  </div>
+                  <span class="term-title">Android 独立构建命令</span>
+                  <button class="copy-btn" data-target="cmd-android-install">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    复制
+                  </button>
+                </div>
+                <div class="terminal-body" id="cmd-android-install">
+<span class="terminal-comment"># 生成优化发布版 APK</span>
+cd mobile
+fvm flutter build apk --release --split-per-abi</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   </section>
 
-  <!-- FAQ Section -->
+  <!-- Expanded FAQ Section -->
   <section class="faq-section" id="faq">
     <div class="section-header">
-      <div class="section-tag">FAQ</div>
+      <div class="section-tag glow-tag">FREQUENTLY ASKED QUESTIONS</div>
       <h2 class="section-title">常见问题解答</h2>
+      <p class="section-desc">关于设备连接、语音引擎、安全隐私及使用技巧的常见疑问。</p>
     </div>
 
     <div class="faq-list">
+      <!-- FAQ 1 -->
       <div class="faq-item active">
         <div class="faq-question">
-          <span>为什么要用 iPhone 做 Mac 语音输入，而不是直接用 Mac 键盘听写？</span>
+          <span>为什么要用手机做电脑的语音输入，而不是直接对着 Mac / PC 自带麦克风说话？</span>
           <span class="faq-icon">▼</span>
         </div>
         <div class="faq-answer">
-          iPhone 拥有专门针对人声调校的多麦克风立体降噪阵列，即使双手远离电脑、斜躺在人体工学椅上也能清晰拾音；且手机端提供了可直观审阅的屏幕和软键盘，方便快速修正个别生僻词错别字。
+          现代智能手机（如 iPhone）拥有专门针对人声近场采样的硬件立体降噪阵列麦克风，即使您身体后仰在人体工学椅上、双手彻底离开桌面，也能清晰敏锐地拾音；此外手机屏幕提供了直观审阅草稿与触控软键盘，便于极低成本纠错生僻词，避免直接上屏后的错别字干扰。
         </div>
       </div>
 
+      <!-- FAQ 2 -->
       <div class="faq-item">
         <div class="faq-question">
-          <span>我的语音和转写的文字会被上传到任何第三方云服务器吗？</span>
+          <span>我的录音音频和转写的文字会被上传到任何第三方云服务器吗？</span>
           <span class="faq-icon">▼</span>
         </div>
         <div class="faq-answer">
-          绝对不会。Vocal 完全开源透明，手机与 Mac 之间通过纯局域网（本地 Wi-Fi）点对点通信；语音识别完全依赖 Apple 原生系统框架（SFSpeechRecognizer），无任何外部云端中转服务器。
+          绝对不会。Vocal 是 100% 开源项目，代码全公开透明。手机端与电脑端通过纯本地局域网（家庭或公司 Wi-Fi）点对点 WebSocket 直连通信，语音听写完全依赖系统端侧神经网络或本地语音引擎，无任何外部公网数据中继。
         </div>
       </div>
 
+      <!-- FAQ 3 -->
       <div class="faq-item">
         <div class="faq-question">
-          <span>为什么采用“手动发送”而不是“边说边自动实时敲到电脑上”？</span>
+          <span>为什么坚持“本地草稿累加 + 手动发送”，而不是像很多输入法那样“边说边流式敲到电脑上”？</span>
           <span class="faq-icon">▼</span>
         </div>
         <div class="faq-answer">
-          实时流式发送容易因为口误、自动纠错或者说话停顿产生反复删改、字符冲突和光标错位；手动发送模式让您完整说完一段话并确认无误后再一键发出，保证输出质量 100% 稳定可靠。
+          实时流式发送存在致命弊端：口误、语音模型上下文动态刷新会导致电脑屏幕上反复发生大量的 Backspace 退格、字符撤回冲突与光标错位，破坏编辑体验。而“本地草稿模式”让您自由畅说一段完整语义，在手机上确认无误后毫秒级敲入，保证输出文本 100% 稳定可靠。
         </div>
       </div>
 
+      <!-- FAQ 4 -->
       <div class="faq-item">
         <div class="faq-question">
-          <span>手机没有自动发现 Mac 电脑怎么办？</span>
+          <span>手机客户端没有自动搜索发现到 Mac / Windows 电脑，该如何排查？</span>
           <span class="faq-icon">▼</span>
         </div>
         <div class="faq-answer">
-          请检查两端是否连接到了同一个 Wi-Fi 网络（尤其是路由器是否分开了 2.4G/5G 或开启了“访客隔离/AP隔离”）；并确保 Mac 宿主程序已启动并在菜单栏正常显示麦克风图标。
+          请检查以下三项：<br>
+          1. 确保手机与电脑连接在同一个 Wi-Fi 网络下（请检查路由器是否开启了“AP 隔离”或“访客模式隔离”，若有请关闭）；<br>
+          2. 确保电脑端宿主程序已正常启动并在系统状态栏常驻运行；<br>
+          3. 若多网段环境下 mDNS 广播受阻，可在手机端通过快速输入电脑局域网 IP（如 <code>ws://192.168.1.xxx:8888</code>）直接发起直连。
+        </div>
+      </div>
+
+      <!-- FAQ 5 -->
+      <div class="faq-item">
+        <div class="faq-question">
+          <span>Mac 端为何需要授予“辅助功能 (Accessibility)”权限？Windows 端需要管理员权限吗？</span>
+          <span class="faq-icon">▼</span>
+        </div>
+        <div class="faq-answer">
+          macOS 拥有严格的系统安全沙盒，任何应用程序模拟虚拟键盘按键（通过 <code>CGEvent</code> 向任意活跃前台应用注入字符与回车）都必须经过系统“辅助功能”显式授权；Windows 端则调用系统标准的 <code>SendInput</code> API，普通用户权限即可正常运行，无需管理员特权。
+        </div>
+      </div>
+
+      <!-- FAQ 6 -->
+      <div class="faq-item">
+        <div class="faq-question">
+          <span>多台 Mac 或电脑在同一个办公室局域网内，手机会连错别人电脑吗？</span>
+          <span class="faq-icon">▼</span>
+        </div>
+        <div class="faq-answer">
+          不会。Vocal 支持在手机端选择特定名称的主机（如 "Bob's MacBook Pro"），且支持配置 6 位动态 PIN 码配对验证，未授权的手机连接请求会被宿主直接拒之门外，保障输入安全。
         </div>
       </div>
     </div>
   </section>
 
-  <!-- Footer -->
+  <!-- Footer Section -->
   <footer class="footer">
     <div class="footer-container">
       <div class="footer-brand">
-        <div style="display: flex; align-items: center; gap: 0.5rem;">
-          <img src="images/logo.png" alt="Vocal" style="width: 24px; height: 24px; border-radius: 6px;">
-          <strong style="font-size: 1.1rem; letter-spacing: 1px;">VOCAL</strong>
+        <div class="footer-logo-row">
+          <img src="images/logo.png" alt="Vocal" class="footer-logo-img">
+          <strong class="footer-logo-text">VOCAL</strong>
+          <span class="badge-version">v1.2.0</span>
         </div>
-        <p class="footer-copy">MIT Licensed &bull; Copyright &copy; 2026 Vocal Contributors.</p>
+        <p class="footer-slogan">基于手机的电脑极速语音录入键盘 · 释放双手 · 专注思考</p>
+        <p class="footer-copy">MIT Licensed &bull; Copyright &copy; 2026 Vocal Open Source Contributors.</p>
       </div>
 
-      <ul class="footer-links">
-        <li><a href="https://github.com/idcpj/vocal" target="_blank" class="footer-link">GitHub 仓库</a></li>
-        <li><a href="#features" class="footer-link">特性介绍</a></li>
-        <li><a href="#download" class="footer-link">安装说明</a></li>
-        <li><a href="#faq" class="footer-link">常见问题</a></li>
-      </ul>
+      <div class="footer-column-group">
+        <div class="footer-column">
+          <h4 class="footer-col-title">快速直达</h4>
+          <ul class="footer-links-list">
+            <li><a href="#playground">趣味互动试玩</a></li>
+            <li><a href="#platforms">四端生态矩阵</a></li>
+            <li><a href="#showcase">双端协同截图</a></li>
+            <li><a href="#features">核心功能特性</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-column">
+          <h4 class="footer-col-title">平台与资源</h4>
+          <ul class="footer-links-list">
+            <li><a href="#download-mac">macOS 宿主程序</a></li>
+            <li><a href="#download-win">Windows 宿主程序</a></li>
+            <li><a href="#download-ios">iOS 移动端</a></li>
+            <li><a href="#download-android">Android 移动端</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-column">
+          <h4 class="footer-col-title">开发者与开源</h4>
+          <ul class="footer-links-list">
+            <li><a href="https://github.com/idcpj/vocal" target="_blank" rel="noopener noreferrer">GitHub 仓库</a></li>
+            <li><a href="https://github.com/idcpj/vocal/releases" target="_blank" rel="noopener noreferrer">Release 历史记录</a></li>
+            <li><a href="#security">安全白皮书</a></li>
+            <li><a href="#faq">常见问题与排障</a></li>
+          </ul>
+        </div>
+      </div>
     </div>
   </footer>
 
-  <!-- Toast Notification -->
-  <div class="toast" id="toast">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#22D3EE" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-    <span class="toast-msg">操作成功</span>
+  <!-- Toast Notification Capsule -->
+  <div class="toast" id="toast" role="alert" aria-live="assertive">
+    <div class="toast-icon-circle">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22D3EE" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+    </div>
+    <span class="toast-msg">操作已成功完成</span>
   </div>
 
   <script src="main.js"></script>
