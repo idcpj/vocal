@@ -2,7 +2,7 @@
 
 **基于 iPhone 的 Mac 高速、低延迟语音录入键盘。**
 
-[English](README.md) | 中文版
+🌐 **官方展示网站**: [https://idcpj.github.io/vocal/](https://idcpj.github.io/vocal/) | [English](README.md) | 中文版
 
 Vocal 将您的 iPhone 转换为专业的远程语音输入设备。它利用苹果原生的语音识别技术（Speech Recognition），通过低延迟的 WebSocket 流将识别结果直接传输到您的 Mac，并像键盘输入一样将文本注入到任何当前选中的应用程序中。
 
