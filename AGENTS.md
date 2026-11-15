@@ -20,6 +20,7 @@
 | Agent 标识 | 角色定位 | 核心职责与管辖范围 | 独立设定与规范 |
 | :--- | :--- | :--- | :--- |
 | **`system-architect`** | 架构与协议专家 | 全链路低延迟架构、mDNS 拓扑、WebSocket 协议制定与双端状态机对齐 | [`agents/system-architect.md`](.agents/agents/system-architect.md) |
+| **`ui-ux-designer`** | UI/UX 视觉与组件专家 | `vocal.pen` 画布维护、极简暗黑科技风规范、新功能交互原型、可复用 pen 组件抽象与多端 UI 同步 | [`agents/ui-ux-designer.md`](.agents/agents/ui-ux-designer.md) |
 | **`mac-host-dev`** | macOS 宿主专家 | `mac/` 目录开发，`VocalHostApp.swift`、Accessibility 字符/回车注入、DMG 打包 | [`agents/mac-host-dev.md`](.agents/agents/mac-host-dev.md) |
 | **`flutter-mobile-dev`** | Flutter 移动端专家 | `mobile/` 目录开发，SFSpeechRecognizer 听写、nsd 局域网发现、草稿累加与动效 | [`agents/flutter-mobile-dev.md`](.agents/agents/flutter-mobile-dev.md) |
 | **`code-reviewer`** | 代码审查守门员 | 全局代码 Diff 审查、协议向后兼容性审计、真机防崩溃规约、测试验证 | [`agents/code-reviewer.md`](.agents/agents/code-reviewer.md) |
@@ -34,15 +35,21 @@ sequenceDiagram
     autonumber
     actor User as 用户 (User)
     participant Lead as 主 Agent (总控与审查)
-    participant Sub as 专业子 Agent (mac/flutter/arch)
+    participant Arch as system-architect
+    participant UI as ui-ux-designer
+    participant Sub as 开发 Agent (mac/flutter)
     participant CR as code-reviewer
 
     User->>Lead: 发送具体任务需求
     alt 涉及跨端协议
-        Lead->>Sub: 委派 system-architect 定义协议契约
-        Sub-->>Lead: 输出规范 Payload 与时序
+        Lead->>Arch: 委派 system-architect 定义协议契约
+        Arch-->>Lead: 输出规范 Payload 与时序
     end
-    Lead->>Sub: 委派具体开发任务 (mac-host-dev / flutter-mobile-dev)
+    alt 涉及界面变动或新增 UI
+        Lead->>UI: 委派 ui-ux-designer 更新 vocal.pen 设计画板
+        UI-->>Lead: 完成 pen.dev 画布更新与保存 (execute / save)
+    end
+    Lead->>Sub: 委派具体开发任务 (mac-host-dev / flutter-mobile-dev 参照 UI/协议实现)
     Sub-->>Lead: 提交代码实现并完成本地编译/自测
     Lead->>CR: 触发代码审查与安全审计
     CR-->>Lead: 输出结构化审查报告 (LGTM 或 Changes Requested)
@@ -66,7 +73,9 @@ sequenceDiagram
    - 语音静音或停止仅关闭麦克风，绝对不得自动发送或清空本地草稿框（`textDraft`）。
 5. **Mac 端零外部依赖与权限防御**:
    - 保持纯 Swift 零外部依赖（`swiftc` 秒级编译）；注入前必须校验 `AXIsProcessTrusted()` 并具备权限未授防御引导。
-6. **终端与文件操作**:
+6. **UI 变更必同步 pen.dev 画布与组件沉淀**:
+   - 涉及任何新增界面或 UI 变更时，必须通过 `ui-ux-designer` 在 `vocal.pen` 中完成设计画板更新；若发现可复用 UI 元素，必须主动将其抽象沉淀为 pen 原生组件（`reusable: true`）并通过实例（`type: "ref"`）复用；严禁直接文本编辑加密的 `.pen` 文件，必须使用 `pencil` MCP 工具链。
+7. **终端与文件操作**:
    - 优先使用 IDE 内置工具，避免终端重定向；禁止执行交互式输入命令；文件保持 UTF-8 无 BOM 编码。
 
 ---

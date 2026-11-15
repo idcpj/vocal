@@ -1,6 +1,23 @@
 import Cocoa
 import Network
 
+/// Supported update distribution channels
+enum UpdateChannel: String, Codable {
+    case github
+    case mas
+}
+
+/// Structured update release information
+struct UpdateInfo {
+    let currentVersion: String
+    let latestVersion: String
+    let releaseNotes: String?
+    let downloadUrl: URL?
+    let channel: UpdateChannel
+    let hasUpdate: Bool
+    var isIgnored: Bool
+}
+
 /// CLI configuration parsed from launch arguments
 struct HostConfig {
     var isTestMode: Bool = false
@@ -9,6 +26,9 @@ struct HostConfig {
     var pingInterval: TimeInterval = 5.0
     var requirePin: Bool = false
     var pinCode: String? = nil
+    var updateChannel: UpdateChannel = .github
+    var updateUrl: String? = nil
+    var checkUpdateOnLaunch: Bool = false
     
     static func parse(arguments: [String]) -> HostConfig {
         var config = HostConfig()
@@ -51,6 +71,28 @@ struct HostConfig {
                 if let interval = Double(val), interval > 0 {
                     config.pingInterval = interval
                 }
+            } else if arg == "--update-channel" {
+                i += 1
+                if i < arguments.count {
+                    if let channel = UpdateChannel(rawValue: arguments[i].lowercased()) {
+                        config.updateChannel = channel
+                    }
+                }
+            } else if arg.starts(with: "--update-channel=") {
+                let val = String(arg.dropFirst("--update-channel=".count)).lowercased()
+                if let channel = UpdateChannel(rawValue: val) {
+                    config.updateChannel = channel
+                }
+            } else if arg == "--update-url" {
+                i += 1
+                if i < arguments.count {
+                    config.updateUrl = arguments[i]
+                }
+            } else if arg.starts(with: "--update-url=") {
+                let val = String(arg.dropFirst("--update-url=".count))
+                config.updateUrl = val
+            } else if arg == "--check-update-on-launch" {
+                config.checkUpdateOnLaunch = true
             } else if arg == "-h" || arg == "--help" {
                 printUsage()
                 exit(0)
@@ -64,13 +106,16 @@ struct HostConfig {
         print("""
         Usage: VocalHost [options]
         Options:
-          --test-mode              Enable test mode with structured NDJSON event logs on stdout
-          --port <PORT>            Specify listening WebSocket port (default: 8888)
-          --no-cg-inject           Mock key injection without system CGEvent/Accessibility calls
-          --ping-interval <SEC>    Heartbeat ping interval in seconds (default: 5.0)
-          --require-pin            Enforce PIN code authentication for connections
-          --pin <PIN>              Specify fixed 4-digit PIN for testing (enables PIN protection)
-          -h, --help               Show help information
+          --test-mode                    Enable test mode with structured NDJSON event logs on stdout
+          --port <PORT>                  Specify listening WebSocket port (default: 8888)
+          --no-cg-inject                 Mock key injection without system CGEvent/Accessibility calls
+          --ping-interval <SEC>          Heartbeat ping interval in seconds (default: 5.0)
+          --require-pin                  Enforce PIN code authentication for connections
+          --pin <PIN>                    Specify fixed 4-digit PIN for testing (enables PIN protection)
+          --update-channel <github|mas>  Distribution channel for updates (default: github)
+          --update-url <URL>             Custom endpoint URL for update checks (testing/mock)
+          --check-update-on-launch       Trigger update check immediately upon launch
+          -h, --help                     Show help information
         """)
     }
 }
@@ -93,6 +138,343 @@ struct MacI18n {
     static var currentPin: String { isChinese ? "PIN 码: " : "PIN Code: " }
     static var refreshPin: String { isChinese ? "刷新 PIN 码" : "Refresh PIN" }
     static var clearTrustedDevices: String { isChinese ? "清除所有已配对设备" : "Clear All Paired Devices" }
+    
+    // Version Updates
+    static var checkForUpdates: String { isChinese ? "检查新版本..." : "Check for Updates..." }
+    static var checkingForUpdates: String { isChinese ? "正在检查更新..." : "Checking for Updates..." }
+    static var autoCheckUpdates: String { isChinese ? "自动检查更新" : "Automatically Check for Updates" }
+    static var resetIgnoredVersion: String { isChinese ? "重置已忽略的版本" : "Reset Ignored Version" }
+    static var newVersionAvailable: String { isChinese ? "发现新版本" : "New Version Available" }
+    static var upToDateTitle: String { isChinese ? "已是最新版本" : "You're Up to Date" }
+    static var upToDateMessage: String { isChinese ? "当前 Vocal 版本已是最新版本。" : "Vocal is up to date." }
+    static var updateAvailableTitle: String { isChinese ? "发现新版本" : "Update Available" }
+    static var downloadNow: String { isChinese ? "立即下载" : "Download Now" }
+    static var updateInAppStore: String { isChinese ? "前往 App Store 更新" : "Update in App Store" }
+    static var remindLater: String { isChinese ? "稍后提醒" : "Remind Me Later" }
+    static var skipThisVersion: String { isChinese ? "忽略此版本" : "Skip This Version" }
+    static var updateCheckFailedTitle: String { isChinese ? "检查更新失败" : "Update Check Failed" }
+    static var updateCheckFailedMessage: String { isChinese ? "无法获取版本信息，请检查网络连接。" : "Failed to retrieve update information. Please check your network." }
+    static var releaseNotes: String { isChinese ? "更新内容：" : "Release Notes:" }
+    static var currentVersionLabel: String { isChinese ? "当前版本：" : "Current Version:" }
+    static var latestVersionLabel: String { isChinese ? "最新版本：" : "Latest Version:" }
+    static var ok: String { isChinese ? "好" : "OK" }
+}
+
+/// Manages multi-channel version update checks (GitHub Releases & Mac App Store)
+class UpdateManager: NSObject {
+    weak var appDelegate: AppDelegate?
+    let config: HostConfig
+    
+    private(set) var isChecking: Bool = false
+    private(set) var availableUpdate: UpdateInfo?
+    
+    var currentVersion: String {
+        if let ver = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String, !ver.isEmpty {
+            return ver
+        }
+        return "1.0.0"
+    }
+    
+    var isAutoCheckEnabled: Bool {
+        get {
+            if UserDefaults.standard.object(forKey: "vocal_auto_check_update") == nil {
+                return true
+            }
+            return UserDefaults.standard.bool(forKey: "vocal_auto_check_update")
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "vocal_auto_check_update")
+            appDelegate?.emitTestEvent([
+                "vocal_event": "UPDATE_AUTO_CHECK_TOGGLED",
+                "enabled": newValue
+            ])
+            appDelegate?.updateMenu()
+        }
+    }
+    
+    var ignoredVersion: String? {
+        get {
+            return UserDefaults.standard.string(forKey: "vocal_ignored_version")
+        }
+        set {
+            let previous = UserDefaults.standard.string(forKey: "vocal_ignored_version")
+            if let val = newValue {
+                UserDefaults.standard.set(val, forKey: "vocal_ignored_version")
+                appDelegate?.emitTestEvent([
+                    "vocal_event": "UPDATE_ACTION_IGNORED",
+                    "version": val
+                ])
+            } else {
+                UserDefaults.standard.removeObject(forKey: "vocal_ignored_version")
+                appDelegate?.emitTestEvent([
+                    "vocal_event": "UPDATE_ACTION_RESET_IGNORED",
+                    "previousVersion": previous ?? ""
+                ])
+            }
+            if var update = availableUpdate {
+                update.isIgnored = (newValue != nil && update.latestVersion == newValue)
+                availableUpdate = update
+            }
+            appDelegate?.updateMenu()
+        }
+    }
+    
+    init(config: HostConfig, appDelegate: AppDelegate? = nil) {
+        self.config = config
+        self.appDelegate = appDelegate
+        super.init()
+    }
+    
+    /// Compares two semver-like version strings (e.g. "1.0.0" vs "1.1.0" or "v1.2.0")
+    static func compareVersions(_ v1: String, _ v2: String) -> ComparisonResult {
+        let clean1 = v1.trimmingCharacters(in: CharacterSet(charactersIn: "vV \t\r\n"))
+        let clean2 = v2.trimmingCharacters(in: CharacterSet(charactersIn: "vV \t\r\n"))
+        
+        let parts1 = clean1.split(separator: "-").first?.split(separator: ".").compactMap { Int($0) } ?? []
+        let parts2 = clean2.split(separator: "-").first?.split(separator: ".").compactMap { Int($0) } ?? []
+        
+        let maxLen = max(parts1.count, parts2.count)
+        for i in 0..<maxLen {
+            let p1 = i < parts1.count ? parts1[i] : 0
+            let p2 = i < parts2.count ? parts2[i] : 0
+            if p1 < p2 { return .orderedAscending }
+            if p1 > p2 { return .orderedDescending }
+        }
+        return .orderedSame
+    }
+    
+    func defaultCheckUrl(for channel: UpdateChannel) -> String {
+        switch channel {
+        case .github:
+            return "https://api.github.com/repos/idcpj/vocal/releases/latest"
+        case .mas:
+            return "https://itunes.apple.com/lookup?bundleId=com.idcpj.vocalhost"
+        }
+    }
+    
+    func checkForUpdates(isManual: Bool = false) {
+        guard !isChecking else { return }
+        isChecking = true
+        appDelegate?.updateMenu()
+        
+        let channel = config.updateChannel
+        let urlString = (config.updateUrl != nil && !config.updateUrl!.isEmpty)
+            ? config.updateUrl!
+            : defaultCheckUrl(for: channel)
+        
+        appDelegate?.emitTestEvent([
+            "vocal_event": "UPDATE_CHECK_STARTED",
+            "channel": channel.rawValue,
+            "url": urlString,
+            "isManual": isManual
+        ])
+        
+        guard let url = URL(string: urlString) else {
+            handleError("Invalid update URL: \(urlString)", isManual: isManual, channel: channel)
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 10.0
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.setValue("VocalHost/\(currentVersion)", forHTTPHeaderField: "User-Agent")
+        if channel == .github {
+            request.setValue("application/vnd.github.v3+json", forHTTPHeaderField: "Accept")
+        }
+        
+        let task = URLSession.shared.dataTask(with: request) { [weak self] (data, response, error) in
+            guard let self = self else { return }
+            
+            if let error = error {
+                DispatchQueue.main.async {
+                    self.handleError(error.localizedDescription, isManual: isManual, channel: channel)
+                }
+                return
+            }
+            
+            guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode), let data = data else {
+                let code = (response as? HTTPURLResponse)?.statusCode ?? -1
+                DispatchQueue.main.async {
+                    self.handleError("HTTP request failed with status code \(code)", isManual: isManual, channel: channel)
+                }
+                return
+            }
+            
+            do {
+                let updateInfo = try self.parseUpdateResponse(data: data, channel: channel)
+                DispatchQueue.main.async {
+                    self.handleSuccess(updateInfo: updateInfo, isManual: isManual)
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self.handleError("Failed to parse update data: \(error.localizedDescription)", isManual: isManual, channel: channel)
+                }
+            }
+        }
+        task.resume()
+    }
+    
+    private func parseUpdateResponse(data: Data, channel: UpdateChannel) throws -> UpdateInfo {
+        let jsonObject = try JSONSerialization.jsonObject(with: data, options: [])
+        let curVer = currentVersion
+        
+        switch channel {
+        case .github:
+            guard let dict = jsonObject as? [String: Any] else {
+                throw NSError(domain: "UpdateManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid GitHub Release JSON format"])
+            }
+            let rawTag = (dict["tag_name"] as? String) ?? (dict["name"] as? String) ?? ""
+            let latestVersion = rawTag.trimmingCharacters(in: CharacterSet(charactersIn: "vV \t\r\n"))
+            let releaseNotes = dict["body"] as? String
+            let htmlUrl = (dict["html_url"] as? String).flatMap { URL(string: $0) }
+            
+            var dmgUrl: URL? = nil
+            if let assets = dict["assets"] as? [[String: Any]] {
+                for asset in assets {
+                    if let assetName = asset["name"] as? String, assetName.hasSuffix(".dmg"),
+                       let downloadStr = asset["browser_download_url"] as? String,
+                       let url = URL(string: downloadStr) {
+                        dmgUrl = url
+                        break
+                    }
+                }
+            }
+            let finalDownloadUrl = dmgUrl ?? htmlUrl
+            let hasUpdate = Self.compareVersions(curVer, latestVersion) == .orderedAscending
+            let isIgnored = (self.ignoredVersion == latestVersion)
+            
+            return UpdateInfo(
+                currentVersion: curVer,
+                latestVersion: latestVersion,
+                releaseNotes: releaseNotes,
+                downloadUrl: finalDownloadUrl,
+                channel: .github,
+                hasUpdate: hasUpdate,
+                isIgnored: isIgnored
+            )
+            
+        case .mas:
+            guard let dict = jsonObject as? [String: Any],
+                  let results = dict["results"] as? [[String: Any]],
+                  let first = results.first else {
+                return UpdateInfo(
+                    currentVersion: curVer,
+                    latestVersion: curVer,
+                    releaseNotes: nil,
+                    downloadUrl: nil,
+                    channel: .mas,
+                    hasUpdate: false,
+                    isIgnored: false
+                )
+            }
+            
+            let rawVersion = first["version"] as? String ?? ""
+            let latestVersion = rawVersion.trimmingCharacters(in: CharacterSet(charactersIn: "vV \t\r\n"))
+            let releaseNotes = first["releaseNotes"] as? String
+            let trackViewUrlStr = first["trackViewUrl"] as? String
+            let downloadUrl = trackViewUrlStr.flatMap { URL(string: $0) }
+            let hasUpdate = Self.compareVersions(curVer, latestVersion) == .orderedAscending
+            let isIgnored = (self.ignoredVersion == latestVersion)
+            
+            return UpdateInfo(
+                currentVersion: curVer,
+                latestVersion: latestVersion,
+                releaseNotes: releaseNotes,
+                downloadUrl: downloadUrl,
+                channel: .mas,
+                hasUpdate: hasUpdate,
+                isIgnored: isIgnored
+            )
+        }
+    }
+    
+    private func handleSuccess(updateInfo: UpdateInfo, isManual: Bool) {
+        self.isChecking = false
+        self.availableUpdate = updateInfo
+        
+        var eventDict: [String: Any] = [
+            "vocal_event": "UPDATE_CHECK_RESULT",
+            "channel": updateInfo.channel.rawValue,
+            "currentVersion": updateInfo.currentVersion,
+            "latestVersion": updateInfo.latestVersion,
+            "hasUpdate": updateInfo.hasUpdate,
+            "isIgnored": updateInfo.isIgnored
+        ]
+        if let downloadUrl = updateInfo.downloadUrl {
+            eventDict["downloadUrl"] = downloadUrl.absoluteString
+        }
+        if let notes = updateInfo.releaseNotes {
+            eventDict["releaseNotes"] = notes
+        }
+        appDelegate?.emitTestEvent(eventDict)
+        
+        appDelegate?.updateMenu()
+        appDelegate?.updateIcon(connected: appDelegate?.isConnected ?? false)
+        
+        // Present modal alert only in non-test interactive runs
+        if !config.isTestMode {
+            if updateInfo.hasUpdate {
+                if !updateInfo.isIgnored || isManual {
+                    showAlertForUpdate(updateInfo)
+                }
+            } else if isManual {
+                showUpToDateAlert(updateInfo)
+            }
+        }
+    }
+    
+    private func handleError(_ errorMsg: String, isManual: Bool, channel: UpdateChannel) {
+        self.isChecking = false
+        appDelegate?.emitTestEvent([
+            "vocal_event": "UPDATE_CHECK_ERROR",
+            "channel": channel.rawValue,
+            "error": errorMsg
+        ])
+        appDelegate?.updateMenu()
+        
+        if isManual && !config.isTestMode {
+            let alert = NSAlert()
+            alert.messageText = MacI18n.updateCheckFailedTitle
+            alert.informativeText = "\(MacI18n.updateCheckFailedMessage)\n(\(errorMsg))"
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: MacI18n.ok)
+            alert.runModal()
+        }
+    }
+    
+    func showAlertForUpdate(_ update: UpdateInfo) {
+        let alert = NSAlert()
+        alert.messageText = "\(MacI18n.updateAvailableTitle): v\(update.latestVersion)"
+        var message = "\(MacI18n.currentVersionLabel) v\(update.currentVersion)\n\(MacI18n.latestVersionLabel) v\(update.latestVersion)"
+        if let notes = update.releaseNotes, !notes.isEmpty {
+            message += "\n\n\(MacI18n.releaseNotes)\n\(notes)"
+        }
+        alert.informativeText = message
+        alert.alertStyle = .informational
+        
+        let primaryBtn = (update.channel == .mas) ? MacI18n.updateInAppStore : MacI18n.downloadNow
+        alert.addButton(withTitle: primaryBtn)
+        alert.addButton(withTitle: MacI18n.remindLater)
+        alert.addButton(withTitle: MacI18n.skipThisVersion)
+        
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
+            if let url = update.downloadUrl {
+                NSWorkspace.shared.open(url)
+            }
+        } else if response == .alertThirdButtonReturn {
+            self.ignoredVersion = update.latestVersion
+        }
+    }
+    
+    func showUpToDateAlert(_ update: UpdateInfo) {
+        let alert = NSAlert()
+        alert.messageText = MacI18n.upToDateTitle
+        alert.informativeText = "\(MacI18n.upToDateMessage) (\(MacI18n.currentVersionLabel) v\(update.currentVersion))"
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: MacI18n.ok)
+        alert.runModal()
+    }
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
@@ -107,6 +489,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
     var menuStatusText: String = MacI18n.starting {
         didSet { updateMenu() }
     }
+    
+    // MARK: - Update Manager
+    lazy var updateManager: UpdateManager = {
+        return UpdateManager(config: self.config, appDelegate: self)
+    }()
     
     // MARK: - PIN Protection & Auth State
     var isPinProtectionEnabled: Bool = false
@@ -165,6 +552,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
         updateMenu()
         checkPermissions()
         startWebSocketServer()
+        
+        // Check for updates on launch if configured or auto-check is enabled in normal mode
+        if config.checkUpdateOnLaunch || (updateManager.isAutoCheckEnabled && !config.isTestMode) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                self?.updateManager.checkForUpdates(isManual: false)
+            }
+        }
         
         // Bring to front if needed, but since it's an accessory app, it stays in the menu bar
         NSApp.activate(ignoringOtherApps: true)
@@ -254,9 +648,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
             // CRITICAL: When connected, isTemplate MUST be false so systemGreen hierarchical tint is not stripped by NSStatusBar
             image?.isTemplate = !connected
             button.image = image
-            button.toolTip = connected
+            
+            let baseTooltip = connected
                 ? (MacI18n.isChinese ? "Vocal: ✅ 已连接" : "Vocal: ✅ Connected")
                 : (MacI18n.isChinese ? "Vocal: ⏳ 等待连接..." : "Vocal: ⏳ Waiting for connection...")
+            
+            let hasNewVersion = (updateManager.availableUpdate?.hasUpdate == true) && (updateManager.availableUpdate?.isIgnored == false)
+            if hasNewVersion, let newVer = updateManager.availableUpdate?.latestVersion {
+                button.toolTip = "\(baseTooltip)\n🎉 \(MacI18n.newVersionAvailable): v\(newVer)"
+            } else {
+                button.toolTip = baseTooltip
+            }
         }
     }
     
@@ -298,10 +700,52 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
         
         menu.addItem(NSMenuItem.separator())
         
+        // Version update items
+        if let update = updateManager.availableUpdate, update.hasUpdate, !update.isIgnored {
+            let updateNoticeItem = NSMenuItem(title: "🎉 \(MacI18n.newVersionAvailable): v\(update.latestVersion)", action: #selector(showAvailableUpdateAlert), keyEquivalent: "")
+            menu.addItem(updateNoticeItem)
+        }
+        
+        let checkUpdateTitle = updateManager.isChecking ? MacI18n.checkingForUpdates : MacI18n.checkForUpdates
+        let checkUpdateItem = NSMenuItem(title: checkUpdateTitle, action: #selector(manualCheckForUpdates), keyEquivalent: "u")
+        if updateManager.isChecking {
+            checkUpdateItem.isEnabled = false
+        }
+        menu.addItem(checkUpdateItem)
+        
+        let autoCheckItem = NSMenuItem(title: MacI18n.autoCheckUpdates, action: #selector(toggleAutoCheckUpdate), keyEquivalent: "")
+        autoCheckItem.state = updateManager.isAutoCheckEnabled ? .on : .off
+        menu.addItem(autoCheckItem)
+        
+        if let ignored = updateManager.ignoredVersion {
+            let resetIgnoredItem = NSMenuItem(title: "\(MacI18n.resetIgnoredVersion) (v\(ignored))", action: #selector(resetIgnoredVersion), keyEquivalent: "")
+            menu.addItem(resetIgnoredItem)
+        }
+        
+        menu.addItem(NSMenuItem.separator())
+        
         let quitItem = NSMenuItem(title: MacI18n.quitVocal, action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         menu.addItem(quitItem)
         
         statusItem?.menu = menu
+    }
+    
+    @objc func manualCheckForUpdates() {
+        updateManager.checkForUpdates(isManual: true)
+    }
+    
+    @objc func toggleAutoCheckUpdate() {
+        updateManager.isAutoCheckEnabled.toggle()
+    }
+    
+    @objc func resetIgnoredVersion() {
+        updateManager.ignoredVersion = nil
+    }
+    
+    @objc func showAvailableUpdateAlert() {
+        if let update = updateManager.availableUpdate {
+            updateManager.showAlertForUpdate(update)
+        }
     }
     
     @objc func togglePinProtection() {
@@ -574,6 +1018,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, NetServiceDelegate {
                                     self.pressReturnKey()
                                 }
                                 didHandleJson = true
+                            }
+                        } else if type == "update_control" {
+                            didHandleJson = true
+                            let action = json["action"] as? String ?? ""
+                            if action == "toggle_auto_check" {
+                                self.toggleAutoCheckUpdate()
+                            } else if action == "ignore_version" {
+                                let ver = json["version"] as? String ?? ""
+                                self.updateManager.ignoredVersion = ver
+                            } else if action == "reset_ignored" {
+                                self.resetIgnoredVersion()
+                            } else if action == "check_now" {
+                                self.manualCheckForUpdates()
                             }
                         }
                     }

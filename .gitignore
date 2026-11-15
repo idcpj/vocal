@@ -1,7 +1,6 @@
 VocalHost
 *.log
 *.dmg
-.DS_Store
 
 # FVM Version Cache
 .fvm/
@@ -9,4 +8,4 @@ build_test/
 build_macos/
 __pycache__/
 *.pyc
-build_macos
+.DS_Store

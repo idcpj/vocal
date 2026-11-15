@@ -19,6 +19,7 @@ from tests.e2e.test_handshake_state import run_handshake_state_tests
 from tests.e2e.test_payload_inject import run_payload_inject_tests
 from tests.e2e.test_heartbeat_reconnect import run_heartbeat_reconnect_tests
 from tests.e2e.test_pin_pairing import run_all_pin_tests
+from tests.e2e.test_update_notification import run_all_update_tests
 
 
 async def main() -> int:
@@ -53,6 +54,13 @@ async def main() -> int:
     except Exception as e:
         print(f"❌ PIN 配对测试失败: {e}")
         results["PIN码安全配对与鉴权门禁 (TC-11~16)"] = False
+
+    # 6. Multi-Channel Update Notification (GitHub & MAS)
+    try:
+        results["多渠道版本更新提示机制 (TC-21~25)"] = await run_all_update_tests()
+    except Exception as e:
+        print(f"❌ 版本更新提示测试失败: {e}")
+        results["多渠道版本更新提示机制 (TC-21~25)"] = False
 
     # Summary
     duration = time.time() - start_time

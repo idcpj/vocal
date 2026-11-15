@@ -167,8 +167,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const simLatencyVal = document.getElementById('sim-latency-val');
   const statInjectedChars = document.getElementById('stat-injected-chars');
   const statSavedSeconds = document.getElementById('stat-saved-seconds');
-  const appTabs = document.querySelectorAll('.app-tab');
-  const appViews = document.querySelectorAll('.app-view');
+  const appTabs = document.querySelectorAll('.app-tab, .app-pill-btn');
+  const appViews = document.querySelectorAll('.app-view, .mac-app-view');
   const activeAppTitle = document.getElementById('active-app-title');
 
   // Stats Counters
@@ -264,7 +264,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Preset Phrases
-  document.querySelectorAll('.phrase-chip').forEach(chip => {
+  document.querySelectorAll('.phrase-chip, .chip-phrase').forEach(chip => {
     chip.addEventListener('click', () => {
       const phrase = chip.getAttribute('data-phrase');
       if (!phrase) return;
@@ -365,7 +365,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // App Switcher
   const appTitles = {
-    vscode: 'workspace/vocal — main.py (VS Code)',
+    vscode: 'workspace/vocal — VS Code (AI Agent)',
     notes: '灵感便签 — 2026年11月13日 (Apple Notes)',
     chat: '团队协作通讯 (Slack / WeChat)'
   };
@@ -411,7 +411,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       // 2. Host Target App Injection with Typing Effect
-      const activeTab = document.querySelector('.app-tab.active');
+      const activeTab = document.querySelector('.app-tab.active, .app-pill-btn.active');
       const activeApp = activeTab ? activeTab.getAttribute('data-app') : 'vscode';
       const shouldEnter = simAutoEnter ? simAutoEnter.checked : true;
 
@@ -438,21 +438,32 @@ document.addEventListener('DOMContentLoaded', () => {
   // Inject into Host Application Views
   function injectTextIntoApp(appKey, text, enter) {
     if (appKey === 'vscode') {
-      const codeTarget = document.getElementById('vscode-injected-content');
-      if (codeTarget) {
-        codeTarget.innerHTML = '';
+      const inputTarget = document.getElementById('vscode-injected-content');
+      const inputShell = document.getElementById('vscode-agent-input-container');
+
+      if (inputShell) inputShell.classList.add('typing');
+
+      if (inputTarget) {
+        inputTarget.innerHTML = '';
         let i = 0;
         const typeTimer = setInterval(() => {
           if (i < text.length) {
-            codeTarget.innerHTML = `<span class="code-string">"${escapeHtml(text.slice(0, i + 1))}"</span>`;
+            inputTarget.innerHTML = `<span>${escapeHtml(text.slice(0, i + 1))}</span><span class="cursor-blink">|</span>`;
             i++;
           } else {
             clearInterval(typeTimer);
+            if (inputShell) inputShell.classList.remove('typing');
+
             if (enter) {
-              codeTarget.innerHTML = `<span class="code-string">"${escapeHtml(text)}"</span>\n<span class="code-comment"># [Enter 已模拟回车换行]</span>`;
+              // 自动回车：模拟瞬间敲下 Enter 提交给 Agent
+              setTimeout(() => {
+                submitPromptToAgent(text);
+              }, 260);
+            } else {
+              inputTarget.innerHTML = `<span>${escapeHtml(text)}</span><span class="cursor-blink">|</span>`;
             }
           }
-        }, 15);
+        }, 14);
       }
     } else if (appKey === 'notes') {
       const notesTarget = document.getElementById('notes-injected-content');
@@ -489,6 +500,80 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // VS Code AI Agent: Submit Prompt & Generate Mock Code Response
+  function submitPromptToAgent(promptText) {
+    const inputTarget = document.getElementById('vscode-injected-content');
+    const messagesContainer = document.getElementById('vscode-agent-messages');
+    if (!messagesContainer) return;
+
+    // 1. Append User Message Bubble
+    const userRow = document.createElement('div');
+    userRow.className = 'agent-msg-row user';
+    userRow.innerHTML = `
+      <div class="agent-avatar user">我</div>
+      <div class="agent-msg-content">
+        <div class="agent-bubble user">${escapeHtml(promptText)}</div>
+      </div>
+    `;
+    messagesContainer.appendChild(userRow);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+    // 2. Reset Agent Input Box
+    if (inputTarget) {
+      inputTarget.innerHTML = `<span class="agent-placeholder">向 Agent 提问或让其编写代码（点击左侧“发送”注入）...</span>`;
+    }
+
+    // 3. Agent Generates Code Response
+    setTimeout(() => {
+      const codeSnippet = generateAgentCodeSnippet(promptText);
+      const assistantRow = document.createElement('div');
+      assistantRow.className = 'agent-msg-row assistant';
+      assistantRow.innerHTML = `
+        <div class="agent-avatar">🤖</div>
+        <div class="agent-msg-content">
+          <div class="agent-bubble">
+            <div style="color:var(--accent-cyan);font-weight:600;font-size:0.75rem;margin-bottom:0.35rem;">⚡ 代码已由 Agent 实时生成：</div>
+            <div class="agent-code-card">
+              <div class="agent-code-head">
+                <span>main.py (Generated)</span>
+                <span>Python 3.12</span>
+              </div>
+              <pre class="agent-code-body"><code>${escapeHtml(codeSnippet)}</code></pre>
+            </div>
+          </div>
+        </div>
+      `;
+      messagesContainer.appendChild(assistantRow);
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }, 320);
+  }
+
+  function generateAgentCodeSnippet(prompt) {
+    if (prompt.includes('并发') || prompt.includes('网络') || prompt.includes('Python')) {
+      return `import asyncio\nimport aiohttp\n\nasync def fetch_worker(session, url):\n    async with session.get(url) as resp:\n        return await resp.json()\n\nasync def main():\n    async with aiohttp.ClientSession() as s:\n        tasks = [fetch_worker(s, f"https://api.lan/node/{i}") for i in range(10)]\n        results = await asyncio.gather(*tasks)\n    print("All tasks completed gracefully.")`;
+    } else if (prompt.includes('死锁') || prompt.includes('锁') || prompt.includes('排查')) {
+      return `from threading import Lock\n\n# 采用锁排序规避循环等待死锁\nmutex_a, mutex_b = Lock(), Lock()\n\ndef safe_transfer():\n    first, second = sorted([mutex_a, mutex_b], key=id)\n    with first:\n        with second:\n            print("Acquired locks in deterministic order.")`;
+    } else if (prompt.includes('UI') || prompt.includes('暗黑') || prompt.includes('界面')) {
+      return `/* 极简暗黑毛玻璃科技面板 */\n.vocal-panel {\n  background: rgba(10, 15, 28, 0.85);\n  backdrop-filter: blur(20px);\n  border: 1px solid rgba(34, 211, 238, 0.3);\n  box-shadow: 0 0 25px rgba(34, 211, 238, 0.15);\n}`;
+    } else {
+      return `async def handle_vocal_stream(stream):\n    async for chunk in stream:\n        await process_payload(chunk)\n    print("Stream processed with zero cloud latency.")`;
+    }
+  }
+
+  // Manual Agent Submit Button
+  const btnAgentSubmit = document.getElementById('btn-agent-submit');
+  if (btnAgentSubmit) {
+    btnAgentSubmit.addEventListener('click', () => {
+      const inputTarget = document.getElementById('vscode-injected-content');
+      if (inputTarget) {
+        const text = inputTarget.textContent.replace('向 Agent 提问或让其编写代码（点击左侧“发送”注入）...', '').replace('|', '').trim();
+        if (text) {
+          submitPromptToAgent(text);
+        }
+      }
+    });
+  }
+
   function escapeHtml(str) {
     return str
       .replace(/&/g, "&amp;")
@@ -501,8 +586,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // =========================================================================
   // 5. Download Center Tabs Switching
   // =========================================================================
-  const dlTabs = document.querySelectorAll('.dl-tab-btn');
-  const dlPanes = document.querySelectorAll('.dl-tab-pane');
+  const dlTabs = document.querySelectorAll('.dl-tab-btn, .dl-pill-btn');
+  const dlPanes = document.querySelectorAll('.dl-tab-pane, .dl-panel');
 
   dlTabs.forEach(tab => {
     tab.addEventListener('click', () => {
@@ -522,13 +607,13 @@ document.addEventListener('DOMContentLoaded', () => {
   function checkUrlHashTab() {
     const hash = window.location.hash;
     if (hash === '#download-mac') {
-      document.querySelector('[data-tab="dl-mac"]')?.click();
+      (document.querySelector('[data-tab="dl-mac"]') || document.querySelector('[data-tab="mac"]'))?.click();
     } else if (hash === '#download-win') {
-      document.querySelector('[data-tab="dl-win"]')?.click();
+      (document.querySelector('[data-tab="dl-win"]') || document.querySelector('[data-tab="win"]'))?.click();
     } else if (hash === '#download-ios') {
-      document.querySelector('[data-tab="dl-ios"]')?.click();
+      (document.querySelector('[data-tab="dl-ios"]') || document.querySelector('[data-tab="ios"]'))?.click();
     } else if (hash === '#download-android') {
-      document.querySelector('[data-tab="dl-android"]')?.click();
+      (document.querySelector('[data-tab="dl-android"]') || document.querySelector('[data-tab="android"]'))?.click();
     }
   }
 
@@ -565,9 +650,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // =========================================================================
   // 7. FAQ Accordion
   // =========================================================================
-  const faqItems = document.querySelectorAll('.faq-item');
+  const faqItems = document.querySelectorAll('.faq-item, .faq-row');
   faqItems.forEach(item => {
-    const question = item.querySelector('.faq-question');
+    const question = item.querySelector('.faq-question, .faq-row-q');
     if (question) {
       question.addEventListener('click', () => {
         const isActive = item.classList.contains('active');
@@ -597,6 +682,67 @@ document.addEventListener('DOMContentLoaded', () => {
       toast.classList.remove('show');
     }, 2800);
   }
+
+  // =========================================================================
+  // 9. Cyber Gallery Tabs & Lightbox Fullscreen Preview
+  // =========================================================================
+  const galleryTabs = document.querySelectorAll('.gallery-tab-btn');
+  const galleryCards = document.querySelectorAll('.gallery-card[data-cat]');
+  const lightbox = document.getElementById('cyber-lightbox');
+  const lightboxImg = document.getElementById('lightbox-img');
+  const lightboxCaption = document.getElementById('lightbox-caption');
+  const lightboxClose = document.getElementById('lightbox-close');
+  const lightboxBackdrop = document.getElementById('lightbox-backdrop');
+
+  // Filter Tabs
+  galleryTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      galleryTabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const filter = tab.getAttribute('data-filter');
+
+      galleryCards.forEach(card => {
+        const cat = card.getAttribute('data-cat');
+        if (filter === 'all' || cat === filter) {
+          card.classList.remove('hidden');
+        } else {
+          card.classList.add('hidden');
+        }
+      });
+    });
+  });
+
+  // Lightbox Preview
+  document.querySelectorAll('.gallery-img-wrap[data-lightbox]').forEach(wrap => {
+    wrap.addEventListener('click', () => {
+      const src = wrap.getAttribute('data-lightbox');
+      const cap = wrap.getAttribute('data-caption') || '画板全屏透视';
+      if (lightbox && lightboxImg && lightboxCaption) {
+        lightboxImg.src = src;
+        lightboxCaption.textContent = cap;
+        lightbox.classList.add('open');
+        lightbox.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+      }
+    });
+  });
+
+  function closeLightbox() {
+    if (lightbox) {
+      lightbox.classList.remove('open');
+      lightbox.setAttribute('aria-hidden', 'true');
+      document.body.style.overflow = '';
+    }
+  }
+
+  lightboxClose?.addEventListener('click', closeLightbox);
+  lightboxBackdrop?.addEventListener('click', closeLightbox);
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && lightbox?.classList.contains('open')) {
+      closeLightbox();
+    }
+  });
 
   // Keyboard shortcut for quick sending in playground: Cmd/Ctrl + Enter
   window.addEventListener('keydown', (e) => {
