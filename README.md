@@ -2,7 +2,7 @@
 
 **High-speed, low-latency voice keyboard for your Mac, powered by your iPhone.**
 
-🌐 **Live Website**: [https://idcpj.github.io/vocal/](https://idcpj.github.io/vocal/) | English | [中文版](README_zh.md)
+🌐 **Live Website**: [https://vocal.idcpj.cc](https://vocal.idcpj.cc) | English | [中文版](README_zh.md)
 
 Vocal turns your iPhone into a professional-grade remote voice input device. It uses native Apple Speech Recognition to stream low-latency transcriptions directly to your Mac, injecting text into any focused application as if you were typing on a keyboard.
 
